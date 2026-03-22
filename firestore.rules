@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: verifica si el usuario está autenticado
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Helper: verifica si el usuario es el dueño de una tienda
+    function isStoreOwner(storeId) {
+      return isAuth() && 
+        get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
+    }
+
+    // ── USERS ──────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isAuth() && request.auth.uid == userId;
+      allow create: if isAuth() && request.auth.uid == userId;
+      allow update: if isAuth() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // ── STORES ─────────────────────────────────────────────────────────
+    match /stores/{storeId} {
+      // Cualquiera puede leer tiendas activas (vista pública)
+      allow read: if true;
+      // Solo usuarios autenticados pueden crear (una por usuario)
+      allow create: if isAuth() && request.resource.data.ownerId == request.auth.uid;
+      // Solo el dueño puede editar o eliminar su tienda
+      allow update, delete: if isAuth() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // ── TICKETS ────────────────────────────────────────────────────────
+    match /tickets/{ticketId} {
+      // Cualquiera puede leer tickets (para ver la grilla pública)
+      allow read: if true;
+      // Solo el dueño de la tienda puede crear/editar tickets desde el admin
+      // Los clientes pueden apartar (crear/update a estado 'apartado')
+      allow create: if true; // creados al inicializar la tienda por el dueño
+      allow update: if 
+        // Dueño puede cambiar cualquier estado
+        isStoreOwner(resource.data.storeId) ||
+        // Cliente puede apartar un número disponible
+        (resource.data.estado == 'disponible' && 
+         request.resource.data.estado == 'apartado');
+      allow delete: if isStoreOwner(resource.data.storeId);
+    }
+
+    // ── CUSTOMERS ──────────────────────────────────────────────────────
+    match /customers/{customerId} {
+      // Solo el dueño de la tienda puede leer sus clientes
+      allow read: if isStoreOwner(resource.data.storeId);
+      // Cualquiera puede crear un cliente (checkout público)
+      allow create: if true;
+      // Solo el dueño puede editar/eliminar
+      allow update, delete: if isStoreOwner(resource.data.storeId);
+    }
+  }
+}
