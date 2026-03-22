@@ -1,12 +1,12 @@
-// Service Worker básico para PWA con estrategia Cache First
-const CACHE_NAME = 'rifasapp-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-];
+// Service Worker v2 - Cache actualizado
+const CACHE_NAME = 'rifasapp-v2';
+const STATIC_ASSETS = ['/index.html', '/manifest.json'];
+
+// En desarrollo (localhost) no cachear nada
+const isDev = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
 
 self.addEventListener('install', (event) => {
+  if (isDev) { self.skipWaiting(); return; }
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
@@ -23,7 +23,8 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Solo cachea GET de mismo origen
+  // En desarrollo: pasar todo directo a la red
+  if (isDev) return;
   if (event.request.method !== 'GET') return;
   if (!event.request.url.startsWith(self.location.origin)) return;
 
