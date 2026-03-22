@@ -6,7 +6,11 @@ import { db } from '../firebase';
 import NumberGrid from '../components/NumberGrid';
 import CountdownTimer from '../components/CountdownTimer';
 import CheckoutModal from '../components/CheckoutModal';
-import { Search, Filter, ShoppingCart, X, Download } from 'lucide-react';
+import { Search, Filter, ShoppingCart, X, Download, Smartphone } from 'lucide-react';
+
+/* Detecta si es iOS */
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isInStandaloneMode = () => ('standalone' in window.navigator) && window.navigator.standalone;
 
 /* ── PWA Install Hook ─────────────────────────── */
 function usePWAInstall() {
@@ -28,6 +32,51 @@ function usePWAInstall() {
   return { canInstall: !!prompt && !installed, install };
 }
 
+/* ── Banner de instalación PWA ────────────────── */
+function PWABanner({ onInstall, onClose, color }) {
+  const ios = isIOS();
+  return (
+    <motion.div
+      initial={{ y: 100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 100, opacity: 0 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+      style={{
+        position: 'fixed', bottom: 16, left: 16, right: 16, zIndex: 90,
+        maxWidth: 480, margin: '0 auto',
+        background: '#fff',
+        borderRadius: 18,
+        border: '1px solid #e9ecef',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+        padding: '16px 18px',
+        display: 'flex', alignItems: 'center', gap: 14,
+        fontFamily: 'Inter, sans-serif',
+      }}
+    >
+      <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}18`, border: `1px solid ${color}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Smartphone size={22} color={color} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 800, color: '#212529', fontSize: 14, marginBottom: 2 }}>Instala esta app</div>
+        {ios
+          ? <div style={{ fontSize: 12, color: '#6c757d', lineHeight: 1.4 }}>Toca <strong>Compartir</strong> (⬆) y luego <strong>«Añadir a pantalla de inicio»</strong></div>
+          : <div style={{ fontSize: 12, color: '#6c757d' }}>Accede rápido desde tu pantalla de inicio</div>
+        }
+      </div>
+      {!ios && (
+        <button onClick={onInstall}
+          style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: color, color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', flexShrink: 0 }}>
+          Instalar
+        </button>
+      )}
+      <button onClick={onClose}
+        style={{ width: 28, height: 28, borderRadius: 8, background: '#f1f3f5', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <X size={13} color="#868e96" />
+      </button>
+    </motion.div>
+  );
+}
+
 export default function StorePage() {
   const { storeId } = useParams();
   const [store, setStore] = useState(null);
@@ -38,6 +87,22 @@ export default function StorePage() {
   const [busqueda, setBusqueda] = useState('');
   const [loadingStore, setLoadingStore] = useState(true);
   const { canInstall, install } = usePWAInstall();
+
+  // Banner PWA: mostrar si no lo han cerrado antes y no está ya instalada
+  const [showPWABanner, setShowPWABanner] = useState(() => {
+    if (isInStandaloneMode()) return false; // ya instalada
+    return localStorage.getItem('pwa_banner_closed') !== '1';
+  });
+
+  const cerrarBanner = () => {
+    setShowPWABanner(false);
+    localStorage.setItem('pwa_banner_closed', '1');
+  };
+
+  const handleInstall = async () => {
+    await install();
+    cerrarBanner();
+  };
 
   useEffect(() => {
     (async () => {
@@ -267,6 +332,18 @@ export default function StorePage() {
           onSuccess={() => { setShowCheckout(false); setSeleccionados([]); }}
         />
       )}
+
+      {/* ── Banner de instalación PWA ─────────────── */}
+      <AnimatePresence>
+        {showPWABanner && !showCheckout && seleccionados.length === 0 && (
+          <PWABanner
+            color={color}
+            onInstall={handleInstall}
+            onClose={cerrarBanner}
+          />
+        )}
+      </AnimatePresence>
+
 
       <style>{`
         @keyframes spin{to{transform:rotate(360deg)}}
