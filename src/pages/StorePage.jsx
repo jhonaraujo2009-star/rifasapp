@@ -205,7 +205,7 @@ export default function StorePage() {
             )}
 
             {/* Stats — solo si el admin lo permite */}
-            {store.mostrar_stats && (
+            {store.mostrar_stats === true && (
               <div style={{ borderRadius: 16, border: '1px solid #e9ecef', background: '#fff', padding: '16px', marginBottom: 14, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                 <div style={{ fontSize: 10, fontWeight: 800, color: '#868e96', textTransform: 'uppercase', letterSpacing: '0.18em', marginBottom: 12 }}>Estado de la rifa</div>
                 {[
