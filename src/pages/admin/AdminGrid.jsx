@@ -173,7 +173,7 @@ export default function AdminGrid() {
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, fontFamily: 'Inter, sans-serif', paddingBottom: 80 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, fontFamily: 'Inter, sans-serif', paddingBottom: 160 }}>
 
       {/* ── Header ──────────────────────────────────── */}
       <div>
@@ -317,7 +317,17 @@ export default function AdminGrid() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 60 }}
             transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-            style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 100, width: 'calc(100% - 40px)', maxWidth: 620 }}
+            style={{
+              position: 'fixed',
+              bottom: 20,
+              // En desktop compensamos el sidebar (240px). En móvil va edge to edge con 16px de margen.
+              left: 'max(256px, 16px)',
+              right: 16,
+              zIndex: 1000,
+              maxWidth: 660,
+              margin: '0 auto',
+              // centrado dentro del espacio disponible a la derecha del sidebar
+            }}
           >
             <div style={{ borderRadius: 20, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(13,11,30,0.97)', backdropFilter: 'blur(20px)', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', boxShadow: '0 8px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)' }}>
 

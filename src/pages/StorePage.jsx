@@ -6,7 +6,8 @@ import { db } from '../firebase';
 import NumberGrid from '../components/NumberGrid';
 import CountdownTimer from '../components/CountdownTimer';
 import CheckoutModal from '../components/CheckoutModal';
-import { Search, Filter, ShoppingCart, X, Download, Smartphone } from 'lucide-react';
+import { Search, Filter, ShoppingCart, X, Download, Smartphone, Lock } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 /* Detecta si es iOS */
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -203,25 +204,27 @@ export default function StorePage() {
               </div>
             )}
 
-            {/* Stats */}
-            <div style={{ borderRadius: 16, border: '1px solid #e9ecef', background: '#fff', padding: '16px', marginBottom: 14, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-              <div style={{ fontSize: 10, fontWeight: 800, color: '#868e96', textTransform: 'uppercase', letterSpacing: '0.18em', marginBottom: 12 }}>Estado de la rifa</div>
-              {[
-                { label: 'Disponibles', val: stats.disponibles, bg: '#f3f4f6', color: '#374151', border: '#d1d5db' },
-                { label: 'Apartados', val: stats.apartados, bg: '#dcfce7', color: '#15803d', border: '#86efac' },
-                { label: 'Vendidos', val: stats.vendidos, bg: '#fee2e2', color: '#b91c1c', border: '#fca5a5' },
-              ].map(({ label, val, bg, color: c, border }) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: 10, background: bg, border: `1px solid ${border}`, marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, color: c, fontWeight: 600 }}>{label}</span>
-                  <span style={{ fontSize: 22, fontWeight: 900, color: c }}>{val}</span>
+            {/* Stats — solo si el admin lo permite */}
+            {store.mostrar_stats && (
+              <div style={{ borderRadius: 16, border: '1px solid #e9ecef', background: '#fff', padding: '16px', marginBottom: 14, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: '#868e96', textTransform: 'uppercase', letterSpacing: '0.18em', marginBottom: 12 }}>Estado de la rifa</div>
+                {[
+                  { label: 'Disponibles', val: stats.disponibles, bg: '#f3f4f6', color: '#374151', border: '#d1d5db' },
+                  { label: 'Apartados', val: stats.apartados, bg: '#dcfce7', color: '#15803d', border: '#86efac' },
+                  { label: 'Vendidos', val: stats.vendidos, bg: '#fee2e2', color: '#b91c1c', border: '#fca5a5' },
+                ].map(({ label, val, bg, color: c, border }) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: 10, background: bg, border: `1px solid ${border}`, marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, color: c, fontWeight: 600 }}>{label}</span>
+                    <span style={{ fontSize: 22, fontWeight: 900, color: c }}>{val}</span>
+                  </div>
+                ))}
+                {/* Mini barra de progreso */}
+                <div style={{ height: 6, borderRadius: 99, background: '#f3f4f6', overflow: 'hidden', display: 'flex', marginTop: 4 }}>
+                  <div style={{ background: '#ef4444', width: `${(stats.vendidos / 1000) * 100}%`, transition: 'width 1s' }} />
+                  <div style={{ background: '#22c55e', width: `${(stats.apartados / 1000) * 100}%`, transition: 'width 1s' }} />
                 </div>
-              ))}
-              {/* Mini barra de progreso */}
-              <div style={{ height: 6, borderRadius: 99, background: '#f3f4f6', overflow: 'hidden', display: 'flex', marginTop: 4 }}>
-                <div style={{ background: '#ef4444', width: `${(stats.vendidos / 1000) * 100}%`, transition: 'width 1s' }} />
-                <div style={{ background: '#22c55e', width: `${(stats.apartados / 1000) * 100}%`, transition: 'width 1s' }} />
               </div>
-            </div>
+            )}
 
             {/* Buscar + filtro */}
             <div style={{ borderRadius: 16, border: '1px solid #e9ecef', background: '#fff', padding: '16px', marginBottom: 14, boxShadow: '0 1px 4px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -353,6 +356,16 @@ export default function StorePage() {
           div[style*="display: flex; gap: 20px"]{flex-direction:column !important;}
         }
       `}</style>
+
+      {/* ── Acceso Admin (discreto, footer) ────────── */}
+      <div
+        style={{ textAlign: 'center', padding: '28px 0 16px', opacity: 0, transition: 'opacity 0.3s' }}
+        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+        onMouseLeave={e => e.currentTarget.style.opacity = '0'}>
+        <Link to="/admin" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 10, background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.1)', color: '#6c757d', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
+          <Lock size={12} /> Administrar
+        </Link>
+      </div>
     </div>
   );
 }

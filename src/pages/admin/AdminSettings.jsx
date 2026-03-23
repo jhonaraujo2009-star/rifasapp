@@ -28,7 +28,7 @@ export default function AdminSettings() {
   const [store, setStore] = useState(null);
   const [form, setForm] = useState({
     nombre: '', whatsapp: '', precio_numero: '', fecha_sorteo: '',
-    color_principal: '#7c3aed', activa: true, logo_url: ''
+    color_principal: '#7c3aed', activa: true, logo_url: '', mostrar_stats: false
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -53,6 +53,7 @@ export default function AdminSettings() {
         color_principal: s.color_principal || '#7c3aed',
         activa: s.activa ?? true,
         logo_url: s.logo_url || '',
+        mostrar_stats: s.mostrar_stats ?? false,
       });
     }
     setLoading(false);
@@ -97,6 +98,7 @@ export default function AdminSettings() {
         fecha_sorteo: form.fecha_sorteo ? new Date(form.fecha_sorteo) : null,
         color_principal: form.color_principal,
         activa: form.activa,
+        mostrar_stats: form.mostrar_stats ?? false,
         ownerId: currentUser.uid,
         logo_url: form.logo_url || '',
         updatedAt: serverTimestamp(),
@@ -244,13 +246,26 @@ export default function AdminSettings() {
           </div>
 
           {/* Toggle activa */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 10 }}>
             <div>
               <div style={{ fontWeight: 700, color: 'white', fontSize: 14 }}>Tienda activa</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>Visible en la página pública de catálogo</div>
             </div>
             <button type="button" onClick={() => setForm(p => ({ ...p, activa: !p.activa }))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
               {form.activa
+                ? <ToggleRight size={38} color="#a78bfa" />
+                : <ToggleLeft size={38} color="rgba(255,255,255,0.2)" />}
+            </button>
+          </div>
+
+          {/* Toggle mostrar_stats */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div>
+              <div style={{ fontWeight: 700, color: 'white', fontSize: 14 }}>Mostrar estadísticas al cliente</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>Si está activo, el cliente verá cuántos números están disponibles, apartados y vendidos</div>
+            </div>
+            <button type="button" onClick={() => setForm(p => ({ ...p, mostrar_stats: !p.mostrar_stats }))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              {form.mostrar_stats
                 ? <ToggleRight size={38} color="#a78bfa" />
                 : <ToggleLeft size={38} color="rgba(255,255,255,0.2)" />}
             </button>

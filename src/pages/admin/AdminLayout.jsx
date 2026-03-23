@@ -179,10 +179,12 @@ export default function AdminLayout() {
             </div>
           </div>
           {storeId && (
-            <a href={`/tienda/${storeId}`} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)', color: '#c4b5fd', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
-              <ExternalLink size={12} /> Ver tienda
-            </a>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <a href={`/tienda/${storeId}`} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)', color: '#c4b5fd', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+                <ExternalLink size={12} /> Ver tabla pública
+              </a>
+            </div>
           )}
         </header>
 
