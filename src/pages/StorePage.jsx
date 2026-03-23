@@ -282,6 +282,7 @@ export default function StorePage() {
                 onSelect={toggleSeleccion}
                 soloDisponibles={soloDisponibles}
                 busqueda={busqueda}
+                mostrarStats={store.mostrar_stats}
               />
             </div>
           </div>

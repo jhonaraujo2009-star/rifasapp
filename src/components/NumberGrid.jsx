@@ -10,7 +10,7 @@ import { Shuffle, X } from 'lucide-react';
   ● Violeta/dorado    = Seleccionado actualmente
 */
 
-export default function NumberGrid({ tickets, seleccionados, onSelect, soloDisponibles, busqueda }) {
+export default function NumberGrid({ tickets, seleccionados, onSelect, soloDisponibles, busqueda, mostrarStats }) {
   const [hovered, setHovered] = useState(null);
 
   const estadoMap = useMemo(() => {
@@ -107,19 +107,21 @@ export default function NumberGrid({ tickets, seleccionados, onSelect, soloDispo
       {/* ── Controles rápidos ────────────────────── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14, alignItems: 'center', justifyContent: 'space-between' }}>
 
-        {/* Mini stats en claro */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {[
-            { label: `Disponibles`, val: conteo.disponibles, bg: '#f3f4f6', border: '#d1d5db', color: '#374151' },
-            { label: `Apartados`, val: conteo.apartados, bg: '#dcfce7', border: '#86efac', color: '#15803d' },
-            { label: `Vendidos`, val: conteo.vendidos, bg: '#fee2e2', border: '#fca5a5', color: '#b91c1c' },
-          ].map(({ label, val, bg, border, color }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 8, background: bg, border: `1px solid ${border}` }}>
-              <span style={{ fontSize: 13, fontWeight: 800, color }}>{val}</span>
-              <span style={{ fontSize: 11, color, opacity: 0.7 }}>{label}</span>
-            </div>
-          ))}
-        </div>
+        {/* Mini stats en claro (solo visibles si mostrarStats es true) */}
+        {mostrarStats && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {[
+              { label: `Disponibles`, val: conteo.disponibles, bg: '#f3f4f6', border: '#d1d5db', color: '#374151' },
+              { label: `Apartados`, val: conteo.apartados, bg: '#dcfce7', border: '#86efac', color: '#15803d' },
+              { label: `Vendidos`, val: conteo.vendidos, bg: '#fee2e2', border: '#fca5a5', color: '#b91c1c' },
+            ].map(({ label, val, bg, border, color }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 8, background: bg, border: `1px solid ${border}` }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color }}>{val}</span>
+                <span style={{ fontSize: 11, color, opacity: 0.7 }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Selección rápida + limpiar */}
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -183,7 +185,7 @@ export default function NumberGrid({ tickets, seleccionados, onSelect, soloDispo
       {/* ── Pie ──────────────────────────────────── */}
       <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <span style={{ fontSize: 11, color: '#9ca3af' }}>
-          {visibles.length.toLocaleString()} de 1.000 números
+          {mostrarStats ? `${visibles.length.toLocaleString()} de 1.000 números` : ''}
         </span>
         {seleccionados.length > 0 && (
           <div style={{ padding: '4px 12px', borderRadius: 20, background: '#ede9fe', border: '1px solid #c4b5fd', fontSize: 12, fontWeight: 800, color: '#5b21b6' }}>
