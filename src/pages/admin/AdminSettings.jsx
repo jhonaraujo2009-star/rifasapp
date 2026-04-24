@@ -8,7 +8,7 @@ import { db } from '../../firebase';
 import {
   Store, Phone, DollarSign, Calendar, Palette, Image,
   Save, ExternalLink, ToggleLeft, ToggleRight, Link,
-  Trash2, RefreshCw, AlertTriangle
+  Trash2, RefreshCw, AlertTriangle, Timer
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -28,7 +28,8 @@ export default function AdminSettings() {
   const [store, setStore] = useState(null);
   const [form, setForm] = useState({
     nombre: '', whatsapp: '', precio_numero: '', fecha_sorteo: '',
-    color_principal: '#7c3aed', activa: true, logo_url: '', mostrar_stats: false
+    color_principal: '#7c3aed', activa: true, logo_url: '', mostrar_stats: false,
+    mostrar_countdown: false
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,12 +49,13 @@ export default function AdminSettings() {
         whatsapp: s.whatsapp || '',
         precio_numero: s.precio_numero || '',
         fecha_sorteo: s.fecha_sorteo?.seconds
-          ? new Date(s.fecha_sorteo.seconds * 1000).toISOString().split('T')[0]
+          ? new Date(s.fecha_sorteo.seconds * 1000 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
           : '',
         color_principal: s.color_principal || '#7c3aed',
         activa: s.activa ?? true,
         logo_url: s.logo_url || '',
         mostrar_stats: s.mostrar_stats ?? false,
+        mostrar_countdown: s.mostrar_countdown ?? false,
       });
     }
     setLoading(false);
@@ -99,6 +101,7 @@ export default function AdminSettings() {
         color_principal: form.color_principal,
         activa: form.activa,
         mostrar_stats: form.mostrar_stats ?? false,
+        mostrar_countdown: form.mostrar_countdown ?? false,
         ownerId: currentUser.uid,
         logo_url: form.logo_url || '',
         updatedAt: serverTimestamp(),
@@ -223,11 +226,11 @@ export default function AdminSettings() {
 
           {/* Fecha sorteo — OPCIONAL */}
           <label style={S.label}>
-            Fecha del sorteo <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 400 }}>(opcional — déjala vacía si no tienes fecha definida)</span>
+            Fecha y hora del sorteo <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 400 }}>(opcional — déjala vacía si no tienes fecha definida)</span>
           </label>
           <div style={{ ...S.iconWrap, marginBottom: 14 }}>
             <Calendar size={14} style={S.icon} />
-            <input name="fecha_sorteo" type="date" value={form.fecha_sorteo} onChange={handle}
+            <input name="fecha_sorteo" type="datetime-local" value={form.fecha_sorteo} onChange={handle}
               style={S.input} onFocus={focus} onBlur={blur} />
           </div>
 
@@ -259,13 +262,28 @@ export default function AdminSettings() {
           </div>
 
           {/* Toggle mostrar_stats */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 10 }}>
             <div>
               <div style={{ fontWeight: 700, color: 'white', fontSize: 14 }}>Mostrar estadísticas al cliente</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>Si está activo, el cliente verá cuántos números están disponibles, apartados y vendidos</div>
             </div>
             <button type="button" onClick={() => setForm(p => ({ ...p, mostrar_stats: !p.mostrar_stats }))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
               {form.mostrar_stats
+                ? <ToggleRight size={38} color="#a78bfa" />
+                : <ToggleLeft size={38} color="rgba(255,255,255,0.2)" />}
+            </button>
+          </div>
+
+          {/* Toggle mostrar_countdown */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div>
+              <div style={{ fontWeight: 700, color: 'white', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Timer size={15} color="#a78bfa" /> Mostrar conteo regresivo
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>Si está activo, los clientes verán la cuenta regresiva con los días, horas, minutos y segundos para el sorteo</div>
+            </div>
+            <button type="button" onClick={() => setForm(p => ({ ...p, mostrar_countdown: !p.mostrar_countdown }))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              {form.mostrar_countdown
                 ? <ToggleRight size={38} color="#a78bfa" />
                 : <ToggleLeft size={38} color="rgba(255,255,255,0.2)" />}
             </button>

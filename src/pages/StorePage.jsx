@@ -196,8 +196,8 @@ export default function StorePage() {
           {/* Sidebar: info + controles */}
           <div style={{ width: 270, flexShrink: 0 }} className="store-sidebar">
 
-            {/* Countdown */}
-            {store.fecha_sorteo && (
+            {/* Countdown — solo visible si el admin lo habilita */}
+            {store.mostrar_countdown && store.fecha_sorteo && (
               <div style={{ borderRadius: 16, border: '1px solid #e9ecef', background: '#fff', padding: '16px', marginBottom: 14, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
                 <div style={{ fontSize: 10, fontWeight: 800, color: '#868e96', textTransform: 'uppercase', letterSpacing: '0.18em', marginBottom: 10, textAlign: 'center' }}>⏳ Tiempo restante</div>
                 <CountdownTimer fechaSorteo={store.fecha_sorteo} />
