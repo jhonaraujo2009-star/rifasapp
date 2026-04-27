@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -6,9 +6,10 @@ import { db } from '../../firebase';
 import { Link } from 'react-router-dom';
 import {
   DollarSign, Ticket, TrendingUp, Clock,
-  CheckCircle, AlertCircle, Calendar, Settings, ArrowRight
+  CheckCircle, AlertCircle, Calendar, Settings, ArrowRight, Printer
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import PrintAvailableNumbers from '../../components/PrintAvailableNumbers';
 
 function StatCard({ icon: Icon, label, value, subtitle, accentColor, delay = 0 }) {
   return (
@@ -43,9 +44,11 @@ function StatCard({ icon: Icon, label, value, subtitle, accentColor, delay = 0 }
 export default function AdminDashboard() {
   const { currentUser } = useAuth();
   const [store, setStore] = useState(null);
+  const [tickets, setTickets] = useState([]);
   const [stats, setStats] = useState({ vendidos: 0, apartados: 0, disponibles: 1000, ingresos: 0 });
   const [liberados, setLiberados] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [showPrint, setShowPrint] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -57,17 +60,18 @@ export default function AdminDashboard() {
         setStore(storeData);
 
         const ticketSnap = await getDocs(query(collection(db, 'tickets'), where('storeId', '==', storeData.id)));
-        const tickets = ticketSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const allTickets = ticketSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setTickets(allTickets);
 
-        const vendidos = tickets.filter(t => t.estado === 'vendido').length;
-        const apartados = tickets.filter(t => t.estado === 'apartado').length;
+        const vendidos = allTickets.filter(t => t.estado === 'vendido').length;
+        const apartados = allTickets.filter(t => t.estado === 'apartado').length;
         const disponibles = 1000 - vendidos - apartados;
         const ingresos = vendidos * (storeData.precio_numero || 0);
         setStats({ vendidos, apartados, disponibles, ingresos });
 
         // Liberación automática (>12h)
         const hace12h = new Date(Date.now() - 12 * 60 * 60 * 1000);
-        const vencidos = tickets.filter(t => t.estado === 'apartado' && t.fecha_apartado?.toDate() < hace12h);
+        const vencidos = allTickets.filter(t => t.estado === 'apartado' && t.fecha_apartado?.toDate() < hace12h);
         if (vencidos.length > 0) {
           const batch = writeBatch(db);
           vencidos.forEach(t => batch.update(doc(db, 'tickets', t.id), { estado: 'disponible', cliente_id: null, fecha_apartado: null }));
@@ -83,6 +87,12 @@ export default function AdminDashboard() {
 
   const pct = (n) => ((n / 1000) * 100).toFixed(1);
   const precio = store?.precio_numero || 0;
+
+  // Números disponibles para imprimir
+  const numerosDisponibles = useMemo(() => {
+    const ocupados = new Set(tickets.filter(t => t.estado === 'vendido' || t.estado === 'apartado').map(t => t.numero));
+    return Array.from({ length: 1000 }, (_, i) => i + 1).filter(n => !ocupados.has(n));
+  }, [tickets]);
 
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 14 }}>
@@ -121,7 +131,13 @@ export default function AdminDashboard() {
           <h1 style={{ fontSize: 26, fontWeight: 900, color: 'white', margin: 0 }}>{store.nombre}</h1>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>Vista general de tu rifa</div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={() => setShowPrint(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 12, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.2)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.5)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.12)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.3)'; }}>
+            <Printer size={14} /> Imprimir números
+          </button>
           <Link to="/admin/grilla" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.7)', textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>
             <Ticket size={14} /> Inventario
           </Link>
@@ -240,6 +256,15 @@ export default function AdminDashboard() {
           ))}
         </div>
       </motion.div>
+
+      {/* Modal de impresión */}
+      {showPrint && (
+        <PrintAvailableNumbers
+          disponibles={numerosDisponibles}
+          storeName={store.nombre}
+          onClose={() => setShowPrint(false)}
+        />
+      )}
     </div>
   );
 }

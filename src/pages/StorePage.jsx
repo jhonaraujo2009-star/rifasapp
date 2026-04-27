@@ -313,7 +313,7 @@ export default function StorePage() {
                   <div style={{ fontWeight: 900, fontSize: 14, color: '#fff' }}>
                     {seleccionados.length} número{seleccionados.length > 1 ? 's' : ''} seleccionado{seleccionados.length > 1 ? 's' : ''}
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Toca para apartar por WhatsApp</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Toca para solicitar por WhatsApp</div>
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
