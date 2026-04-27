@@ -201,20 +201,26 @@ export default function PrintAvailableNumbers({ disponibles, storeName, onClose 
 
   return (
     <AnimatePresence>
+      {/* Overlay + centering container */}
       <motion.div key="print-overlay"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 300 }}
-      />
-
+        style={{
+          position: 'fixed', inset: 0, zIndex: 300,
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '16px',
+        }}
+      >
       <motion.div key="print-modal"
         initial={{ opacity: 0, scale: 0.93, y: 30 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+        onClick={e => e.stopPropagation()}
         style={{
-          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          zIndex: 301, width: '92vw', maxWidth: 780, maxHeight: '90vh',
+          width: '100%', maxWidth: 780,
+          maxHeight: 'calc(100vh - 32px)',
           background: '#0d0b1e', borderRadius: 24,
           border: '1px solid rgba(255,255,255,0.1)',
           display: 'flex', flexDirection: 'column',
@@ -446,6 +452,7 @@ export default function PrintAvailableNumbers({ disponibles, storeName, onClose 
             </>
           )}
         </div>
+      </motion.div>
       </motion.div>
     </AnimatePresence>
   );
