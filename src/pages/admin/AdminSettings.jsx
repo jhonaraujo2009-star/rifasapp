@@ -8,7 +8,7 @@ import { db } from '../../firebase';
 import {
   Store, Phone, DollarSign, Calendar, Palette, Image,
   Save, ExternalLink, ToggleLeft, ToggleRight, Link,
-  Trash2, RefreshCw, AlertTriangle, Timer
+  Trash2, RefreshCw, AlertTriangle, Timer, Lock, Tag, Hash
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -29,7 +29,9 @@ export default function AdminSettings() {
   const [form, setForm] = useState({
     nombre: '', whatsapp: '', precio_numero: '', fecha_sorteo: '',
     color_principal: '#7c3aed', activa: true, logo_url: '', mostrar_stats: false,
-    mostrar_countdown: false
+    mostrar_countdown: false,
+    bloquear_seleccion: false, fecha_habilitacion: '',
+    precio_descuento: '', cantidad_descuento: ''
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,6 +58,12 @@ export default function AdminSettings() {
         logo_url: s.logo_url || '',
         mostrar_stats: s.mostrar_stats ?? false,
         mostrar_countdown: s.mostrar_countdown ?? false,
+        bloquear_seleccion: s.bloquear_seleccion ?? false,
+        fecha_habilitacion: s.fecha_habilitacion?.seconds
+          ? new Date(s.fecha_habilitacion.seconds * 1000 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+          : '',
+        precio_descuento: s.precio_descuento || '',
+        cantidad_descuento: s.cantidad_descuento || '',
       });
     }
     setLoading(false);
@@ -97,11 +105,15 @@ export default function AdminSettings() {
         nombre: form.nombre,
         whatsapp: form.whatsapp,
         precio_numero: Number(form.precio_numero) || 0,
+        precio_descuento: Number(form.precio_descuento) || 0,
+        cantidad_descuento: Number(form.cantidad_descuento) || 0,
         fecha_sorteo: form.fecha_sorteo ? new Date(form.fecha_sorteo) : null,
         color_principal: form.color_principal,
         activa: form.activa,
         mostrar_stats: form.mostrar_stats ?? false,
         mostrar_countdown: form.mostrar_countdown ?? false,
+        bloquear_seleccion: form.bloquear_seleccion ?? false,
+        fecha_habilitacion: form.fecha_habilitacion ? new Date(form.fecha_habilitacion) : null,
         ownerId: currentUser.uid,
         logo_url: form.logo_url || '',
         updatedAt: serverTimestamp(),
@@ -224,6 +236,38 @@ export default function AdminSettings() {
               placeholder="5000" style={S.input} onFocus={focus} onBlur={blur} />
           </div>
 
+          {/* Descuento por cantidad */}
+          <div style={{ padding: '16px', borderRadius: 14, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)', marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#10b981', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Tag size={14} /> Descuento por cantidad <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.35)' }}>(opcional)</span>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...S.label, fontSize: 11 }}>A partir de (cantidad)</label>
+                <div style={S.iconWrap}>
+                  <Hash size={14} style={S.icon} />
+                  <input name="cantidad_descuento" type="number" min="2" value={form.cantidad_descuento} onChange={handle}
+                    placeholder="Ej: 2" style={S.input} onFocus={focus} onBlur={blur} />
+                </div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...S.label, fontSize: 11 }}>Precio c/u con descuento</label>
+                <div style={S.iconWrap}>
+                  <DollarSign size={14} style={S.icon} />
+                  <input name="precio_descuento" type="number" min="0" step="0.01" value={form.precio_descuento} onChange={handle}
+                    placeholder="Ej: 2.50" style={S.input} onFocus={focus} onBlur={blur} />
+                </div>
+              </div>
+            </div>
+            {form.precio_numero && form.precio_descuento && form.cantidad_descuento ? (
+              <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', fontSize: 12, color: '#6ee7b7', lineHeight: 1.6 }}>
+                📋 <strong>Ejemplo:</strong> 1 ticket = <strong>${Number(form.precio_numero).toLocaleString()}</strong> · {form.cantidad_descuento}+ tickets = <strong>${Number(form.precio_descuento).toLocaleString()}</strong> c/u
+              </div>
+            ) : (
+              <p style={{ ...S.hint, color: 'rgba(255,255,255,0.25)' }}>Si configuras descuento, al comprar {form.cantidad_descuento || '2+'} o más tickets cada uno costará menos.</p>
+            )}
+          </div>
+
           {/* Fecha sorteo — OPCIONAL */}
           <label style={S.label}>
             Fecha y hora del sorteo <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 400 }}>(opcional — déjala vacía si no tienes fecha definida)</span>
@@ -275,7 +319,7 @@ export default function AdminSettings() {
           </div>
 
           {/* Toggle mostrar_countdown */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 10 }}>
             <div>
               <div style={{ fontWeight: 700, color: 'white', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Timer size={15} color="#a78bfa" /> Mostrar conteo regresivo
@@ -288,6 +332,37 @@ export default function AdminSettings() {
                 : <ToggleLeft size={38} color="rgba(255,255,255,0.2)" />}
             </button>
           </div>
+
+          {/* Toggle bloquear_seleccion */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: 12, background: form.bloquear_seleccion ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${form.bloquear_seleccion ? 'rgba(251,191,36,0.25)' : 'rgba(255,255,255,0.08)'}`, marginBottom: form.bloquear_seleccion ? 0 : 0 }}>
+            <div>
+              <div style={{ fontWeight: 700, color: 'white', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Lock size={15} color="#fbbf24" /> Bloquear selección de números
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>Los clientes podrán ver la página pero no podrán seleccionar números hasta la fecha indicada</div>
+            </div>
+            <button type="button" onClick={() => setForm(p => ({ ...p, bloquear_seleccion: !p.bloquear_seleccion }))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              {form.bloquear_seleccion
+                ? <ToggleRight size={38} color="#fbbf24" />
+                : <ToggleLeft size={38} color="rgba(255,255,255,0.2)" />}
+            </button>
+          </div>
+
+          {/* Fecha de habilitación — solo visible si bloquear_seleccion está activo */}
+          {form.bloquear_seleccion && (
+            <div style={{ padding: '14px 16px', borderRadius: '0 0 12px 12px', background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.15)', borderTop: 'none' }}>
+              <label style={{ ...S.label, color: 'rgba(255,255,255,0.6)' }}>
+                ¿Cuándo se habilita la selección? *
+              </label>
+              <div style={S.iconWrap}>
+                <Calendar size={14} style={S.icon} />
+                <input name="fecha_habilitacion" type="datetime-local" value={form.fecha_habilitacion} onChange={handle}
+                  required
+                  style={S.input} onFocus={focus} onBlur={blur} />
+              </div>
+              <p style={S.hint}>Los clientes verán un conteo regresivo hasta esta fecha. Cuando se cumpla, podrán seleccionar números automáticamente.</p>
+            </div>
+          )}
         </div>
 
         <button type="submit" disabled={saving}

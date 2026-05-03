@@ -13,8 +13,14 @@ import { X, MessageCircle, Ticket, Send } from 'lucide-react';
   ✅ Simplificado: sin campos de nombre, teléfono ni cédula.
 */
 export default function CheckoutModal({ store, seleccionados, onClose, onSuccess }) {
-  const precio = store?.precio_numero || 0;
-  const total = seleccionados.length * precio;
+  const precioBase = store?.precio_numero || 0;
+  const precioDesc = store?.precio_descuento || 0;
+  const cantidadDesc = store?.cantidad_descuento || 0;
+  const tieneDescuento = precioDesc > 0 && cantidadDesc > 0 && seleccionados.length >= cantidadDesc;
+  const precioUnitario = tieneDescuento ? precioDesc : precioBase;
+  const total = seleccionados.length * precioUnitario;
+  const totalSinDescuento = seleccionados.length * precioBase;
+  const ahorro = totalSinDescuento - total;
   const whatsapp = store?.whatsapp?.replace(/\D/g, '') || '';
   const color = store?.color_principal || '#7c3aed';
 
@@ -23,13 +29,16 @@ export default function CheckoutModal({ store, seleccionados, onClose, onSuccess
   const generarMensaje = () => {
     const nums = numerosOrdenados
       .map(n => String(n).padStart(3, '0')).join(', ');
-    return encodeURIComponent(
+    let msg =
       `¡Hola! 👋 Quiero apartar estos números de la rifa *${store.nombre}*:\n\n` +
       `🎟️ *Números:* ${nums}\n` +
       `📦 *Cantidad:* ${seleccionados.length} número${seleccionados.length > 1 ? 's' : ''}\n` +
-      `💰 *Total:* $${total.toLocaleString()}\n\n` +
-      `¿Cómo realizo el pago? 🙏`
-    );
+      `💲 *Precio c/u:* $${precioUnitario.toLocaleString()}`;
+    if (tieneDescuento) {
+      msg += ` _(descuento aplicado)_`;
+    }
+    msg += `\n💰 *Total:* $${total.toLocaleString()}\n\n¿Cómo realizo el pago? 🙏`;
+    return encodeURIComponent(msg);
   };
 
   const enviar = () => {
@@ -108,9 +117,26 @@ export default function CheckoutModal({ store, seleccionados, onClose, onSuccess
                   </span>
                 ))}
               </div>
-              <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 14, color: '#6b7280', fontWeight: 600 }}>💰 Total a pagar</span>
-                <span style={{ fontSize: 28, fontWeight: 900, color: '#1a1a2e' }}>${total.toLocaleString()}</span>
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid #e5e7eb' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: tieneDescuento ? 8 : 0 }}>
+                  <span style={{ fontSize: 14, color: '#6b7280', fontWeight: 600 }}>💰 Total a pagar</span>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: 28, fontWeight: 900, color: '#1a1a2e' }}>${total.toLocaleString()}</span>
+                    {tieneDescuento && (
+                      <div style={{ fontSize: 12, color: '#9ca3af' }}>
+                        <span style={{ textDecoration: 'line-through' }}>${totalSinDescuento.toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {tieneDescuento && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                    <span style={{ fontSize: 12 }}>🏷️</span>
+                    <span style={{ fontSize: 12, color: '#166534', fontWeight: 700 }}>
+                      Descuento aplicado: ${precioUnitario.toLocaleString()} c/u · Ahorras ${ahorro.toLocaleString()}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

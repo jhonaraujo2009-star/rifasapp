@@ -6,7 +6,7 @@ import { db } from '../firebase';
 import NumberGrid from '../components/NumberGrid';
 import CountdownTimer from '../components/CountdownTimer';
 import CheckoutModal from '../components/CheckoutModal';
-import { Search, Filter, ShoppingCart, X, Download, Smartphone, Lock } from 'lucide-react';
+import { Search, Filter, ShoppingCart, X, Download, Smartphone, Lock, Clock, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 /* Detecta si es iOS */
@@ -129,7 +129,52 @@ export default function StorePage() {
     return { vendidos, apartados, disponibles: 1000 - vendidos - apartados };
   }, [tickets]);
 
+  /* ── Lock / unlock selection logic ──── */
+  const [lockTimeLeft, setLockTimeLeft] = useState(null);
+  const seleccionBloqueada = useMemo(() => {
+    if (!store?.bloquear_seleccion) return false;
+    if (!store?.fecha_habilitacion) return true; // blocked with no unlock date
+    const target = store.fecha_habilitacion?.seconds
+      ? store.fecha_habilitacion.seconds * 1000
+      : new Date(store.fecha_habilitacion).getTime();
+    return Date.now() < target;
+  }, [store, lockTimeLeft]); // lockTimeLeft dependency forces re-eval every second
+
+  useEffect(() => {
+    if (!store?.bloquear_seleccion || !store?.fecha_habilitacion) return;
+    const target = store.fecha_habilitacion?.seconds
+      ? store.fecha_habilitacion.seconds * 1000
+      : new Date(store.fecha_habilitacion).getTime();
+
+    const tick = () => {
+      const diff = target - Date.now();
+      if (diff <= 0) {
+        setLockTimeLeft(null);
+        return;
+      }
+      setLockTimeLeft({
+        dias: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        horas: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        minutos: Math.floor((diff / (1000 * 60)) % 60),
+        segundos: Math.floor((diff / 1000) % 60),
+      });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [store]);
+
   const color = store?.color_principal || '#7c3aed';
+
+  /* ── Discount pricing logic ────────── */
+  const calcularPrecio = (cantidad) => {
+    const precioBase = store?.precio_numero || 0;
+    const precioDesc = store?.precio_descuento || 0;
+    const cantidadDesc = store?.cantidad_descuento || 0;
+    const tieneDescuento = precioDesc > 0 && cantidadDesc > 0 && cantidad >= cantidadDesc;
+    const precioUnitario = tieneDescuento ? precioDesc : precioBase;
+    return { precioUnitario, total: cantidad * precioUnitario, tieneDescuento, precioBase };
+  };
 
   /* ── Loading ────────────────────────── */
   if (loadingStore) return (
@@ -169,7 +214,14 @@ export default function StorePage() {
             }
             <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: 800, color: '#212529', fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>{store.nombre}</div>
-              <div style={{ fontSize: 11, color: '#868e96', fontWeight: 600 }}>${(store.precio_numero || 0).toLocaleString()} por número</div>
+              <div style={{ fontSize: 11, color: '#868e96', fontWeight: 600 }}>
+                ${(store.precio_numero || 0).toLocaleString()} por número
+                {store.precio_descuento > 0 && store.cantidad_descuento > 0 && (
+                  <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 6, background: '#d1fae5', color: '#065f46', fontSize: 10, fontWeight: 700 }}>
+                    {store.cantidad_descuento}+ = ${store.precio_descuento.toLocaleString()} c/u
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -264,13 +316,90 @@ export default function StorePage() {
 
           {/* Grilla de números — ocupa todo el espacio restante */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ borderRadius: 16, border: '1px solid #e9ecef', background: '#fff', padding: '20px', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
+            <div style={{ borderRadius: 16, border: '1px solid #e9ecef', background: '#fff', padding: '20px', boxShadow: '0 1px 8px rgba(0,0,0,0.06)', position: 'relative' }}>
+
+              {/* ── Lock overlay ───────────────────────────────── */}
+              {seleccionBloqueada && (
+                <div style={{
+                  marginBottom: 16,
+                  padding: '20px',
+                  borderRadius: 14,
+                  background: 'linear-gradient(135deg, #fef3c7, #fffbeb)',
+                  border: '1px solid #fcd34d',
+                  textAlign: 'center',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10 }}>
+                    <div style={{
+                      width: 40, height: 40, borderRadius: 12,
+                      background: 'rgba(251,191,36,0.2)', border: '1px solid rgba(251,191,36,0.3)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      <Lock size={20} color="#d97706" />
+                    </div>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontWeight: 800, color: '#92400e', fontSize: 15 }}>
+                        Selección bloqueada
+                      </div>
+                      <div style={{ fontSize: 12, color: '#b45309', marginTop: 1 }}>
+                        Los números se podrán elegir próximamente
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Countdown until unlock */}
+                  {lockTimeLeft && (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 10 }}>
+                        <Clock size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                        Se habilita en
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
+                        {[
+                          { label: 'Días', value: lockTimeLeft.dias },
+                          { label: 'Horas', value: lockTimeLeft.horas },
+                          { label: 'Min', value: lockTimeLeft.minutos },
+                          { label: 'Seg', value: lockTimeLeft.segundos },
+                        ].map(({ label, value }, i, arr) => (
+                          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <div style={{
+                                width: 54, height: 54, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                borderRadius: 12, background: '#fff', border: '2px solid #fcd34d',
+                                boxShadow: '0 2px 8px rgba(251,191,36,0.2)',
+                              }}>
+                                <span style={{
+                                  fontSize: 24, fontWeight: 900, color: '#92400e',
+                                  fontFamily: 'Inter, system-ui, sans-serif',
+                                  fontVariantNumeric: 'tabular-nums',
+                                }}>
+                                  {String(value ?? 0).padStart(2, '0')}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: '#b45309', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                {label}
+                              </span>
+                            </div>
+                            {i < arr.length - 1 && (
+                              <span style={{ fontSize: 20, fontWeight: 900, color: '#d97706', marginBottom: 18, animation: 'blink 1s step-end infinite' }}>:</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
                 <div>
-                  <div style={{ fontWeight: 800, color: '#212529', fontSize: 15 }}>Elige tus números</div>
-                  <div style={{ fontSize: 12, color: '#868e96', marginTop: 2 }}>Toca los disponibles para seleccionarlos</div>
+                  <div style={{ fontWeight: 800, color: '#212529', fontSize: 15 }}>
+                    {seleccionBloqueada ? '🔒 Números de la rifa' : 'Elige tus números'}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#868e96', marginTop: 2 }}>
+                    {seleccionBloqueada ? 'Puedes ver los números, pero la selección aún no está habilitada' : 'Toca los disponibles para seleccionarlos'}
+                  </div>
                 </div>
-                {seleccionados.length > 0 && (
+                {!seleccionBloqueada && seleccionados.length > 0 && (
                   <div style={{ padding: '5px 14px', borderRadius: 20, background: `${color}15`, border: `1px solid ${color}44`, fontSize: 13, fontWeight: 800, color }}>
                     ✓ {seleccionados.length} elegido{seleccionados.length > 1 ? 's' : ''}
                   </div>
@@ -278,20 +407,21 @@ export default function StorePage() {
               </div>
               <NumberGrid
                 tickets={tickets}
-                seleccionados={seleccionados}
+                seleccionados={seleccionBloqueada ? [] : seleccionados}
                 onSelect={toggleSeleccion}
                 soloDisponibles={soloDisponibles}
                 busqueda={busqueda}
                 mostrarStats={store.mostrar_stats}
+                disabled={seleccionBloqueada}
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Carrito flotante ─────────────────────── */}
+      {/* ── Carrito flotante (hidden when locked) ─────────────── */}
       <AnimatePresence>
-        {seleccionados.length > 0 && (
+        {!seleccionBloqueada && seleccionados.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 80 }}
             animate={{ opacity: 1, y: 0 }}
@@ -317,10 +447,24 @@ export default function StorePage() {
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 900, fontSize: 20, color: '#fff' }}>
-                  ${(seleccionados.length * (store.precio_numero || 0)).toLocaleString()}
-                </div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Total</div>
+                {(() => {
+                  const p = calcularPrecio(seleccionados.length);
+                  return (
+                    <>
+                      <div style={{ fontWeight: 900, fontSize: 20, color: '#fff' }}>
+                        ${p.total.toLocaleString()}
+                      </div>
+                      {p.tieneDescuento ? (
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>
+                          <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>${(seleccionados.length * p.precioBase).toLocaleString()}</span>
+                          {' '}<span style={{ background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>-${((seleccionados.length * p.precioBase) - p.total).toLocaleString()} desc.</span>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Total</div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </button>
           </motion.div>
@@ -352,6 +496,7 @@ export default function StorePage() {
       <style>{`
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
         @media(max-width:768px){
           .store-sidebar{width:100% !important;}
           div[style*="display: flex; gap: 20px"]{flex-direction:column !important;}

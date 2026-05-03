@@ -10,7 +10,7 @@ import { Shuffle, X } from 'lucide-react';
   ● Violeta/dorado    = Seleccionado actualmente
 */
 
-export default function NumberGrid({ tickets, seleccionados, onSelect, soloDisponibles, busqueda, mostrarStats }) {
+export default function NumberGrid({ tickets, seleccionados, onSelect, soloDisponibles, busqueda, mostrarStats, disabled }) {
   const [hovered, setHovered] = useState(null);
 
   const estadoMap = useMemo(() => {
@@ -38,11 +38,13 @@ export default function NumberGrid({ tickets, seleccionados, onSelect, soloDispo
   }), [numeros, estadoMap]);
 
   const handleClick = (n) => {
+    if (disabled) return;
     if ((estadoMap[n] || 'disponible') !== 'disponible') return;
     onSelect(n);
   };
 
   const seleccionarAleatorios = (cantidad) => {
+    if (disabled) return;
     const disp = numeros.filter(
       n => (estadoMap[n] || 'disponible') === 'disponible' && !seleccionados.includes(n)
     );
@@ -93,12 +95,13 @@ export default function NumberGrid({ tickets, seleccionados, onSelect, soloDispo
     };
     // Disponible normal — fondo blanco limpio
     return {
-      background: '#ffffff',
+      background: disabled ? '#f3f4f6' : '#ffffff',
       border: '1px solid #e5e7eb',
-      color: '#374151',
+      color: disabled ? '#9ca3af' : '#374151',
       fontWeight: 600,
-      cursor: 'pointer',
+      cursor: disabled ? 'not-allowed' : 'pointer',
       boxShadow: '0 1px 3px rgba(0,0,0,0.07)',
+      opacity: disabled ? 0.7 : 1,
     };
   };
 
