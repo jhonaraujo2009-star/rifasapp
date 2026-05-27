@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { to: '/admin/clientes', icon: Users, label: 'Clientes' },
   { to: '/admin/exportar', icon: Download, label: 'Exportar' },
   { to: '/admin/ajustes', icon: Settings, label: 'Ajustes' },
+  { to: '/admin/ticket', icon: Ticket, label: 'Ticket Virtual' },
 ];
 
 export default function AdminLayout() {

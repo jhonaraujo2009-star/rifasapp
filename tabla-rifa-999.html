@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tabla de Rifa — 001 al 999</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background: #f0f0f0;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .page {
+      width: 210mm;
+      background: white;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.15);
+      padding: 0 5mm;
+    }
+
+    /* ── Tabla ─────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    td {
+      text-align: center;
+      font-size: 7.5pt;
+      font-weight: 900;
+      color: #111;
+      border: 0.5px solid #ccc;
+      height: 7.3mm;
+      vertical-align: middle;
+      padding: 0;
+    }
+    /* Borde exterior */
+    table { border: 1.5px solid #222; }
+
+    .empty {
+      border-color: #eee;
+    }
+
+    /* ── Botón imprimir ── */
+    .no-print {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 28px;
+      border-radius: 12px;
+      border: none;
+      background: #1a1a2e;
+      color: white;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      z-index: 10;
+    }
+    .no-print:hover { background: #2d2b55; }
+
+    /* ── Print ────────────── */
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 2mm;
+      }
+      body {
+        background: white;
+        padding: 0;
+      }
+      .page {
+        width: 100%;
+        box-shadow: none;
+        padding: 0 4mm;
+      }
+      td {
+        height: 7.3mm;
+        font-size: 7.5pt;
+      }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page">
+  <table id="tabla"></table>
+</div>
+
+<button class="no-print" onclick="window.print()">🖨️ Imprimir</button>
+
+<script>
+  const tabla = document.getElementById('tabla');
+  const cols = 27;
+  const total = 999;
+  let num = 1;
+
+  for (let r = 0; r < 37; r++) {
+    const tr = document.createElement('tr');
+    for (let c = 0; c < cols; c++) {
+      const td = document.createElement('td');
+      if (num <= total) {
+        td.textContent = String(num).padStart(3, '0');
+      } else {
+        td.className = 'empty';
+      }
+      tr.appendChild(td);
+      num++;
+    }
+    tabla.appendChild(tr);
+  }
+</script>
+
+</body>
+</html>

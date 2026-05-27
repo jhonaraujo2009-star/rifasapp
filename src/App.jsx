@@ -17,6 +17,7 @@ import AdminGrid      from './pages/admin/AdminGrid';
 import AdminCustomers from './pages/admin/AdminCustomers';
 import AdminSettings  from './pages/admin/AdminSettings';
 import AdminExport    from './pages/admin/AdminExport';
+import AdminTicket    from './pages/admin/AdminTicket';
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="clientes"   element={<AdminCustomers />} />
             <Route path="exportar"   element={<AdminExport />} />
             <Route path="ajustes"    element={<AdminSettings />} />
+            <Route path="ticket"     element={<AdminTicket />} />
           </Route>
 
           {/* Fallback */}
