@@ -479,21 +479,17 @@ export default function AdminTicket() {
                 </div>
               </div>
 
-              {/* ── FOOTER ─────────────────────────────── */}
+              {/* ── FOOTER CONTACTO ────────────────────── */}
               <div style={{
                 padding: '14px 24px 16px',
                 borderTop: '1px solid #f0f0f0',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                textAlign: 'center',
               }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '5px 14px',
-                  borderRadius: 8,
-                  background: '#ecfdf5',
-                  border: '1px solid #d1fae5',
-                }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#059669' }}>Confirmado</span>
+                <div style={{ fontSize: 11, fontWeight: 500, color: '#777', lineHeight: 1.8 }}>
+                  📍 Mercado Principal de Tovar, frente a la tienda de maquillaje
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#666', marginTop: 2 }}>
+                  📞 0412-049-6690
                 </div>
               </div>
 
