@@ -335,6 +335,47 @@ export default function AdminTicket() {
           >
             <div style={{ background: '#ffffff', position: 'relative' }}>
 
+              {/* ── WATERMARK ─────────────────────────── */}
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 0,
+                overflow: 'hidden',
+                pointerEvents: 'none',
+                borderRadius: 18,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 0,
+              }}>
+                {Array.from({ length: 7 }).map((_, rowIdx) => (
+                  <div key={rowIdx} style={{
+                    display: 'flex',
+                    gap: '32px',
+                    whiteSpace: 'nowrap',
+                    transform: `rotate(-35deg) translateX(${rowIdx % 2 === 0 ? '-40px' : '20px'})`,
+                    marginBottom: '18px',
+                    opacity: 0.07,
+                  }}>
+                    {Array.from({ length: 4 }).map((_, colIdx) => (
+                      <span key={colIdx} style={{
+                        fontSize: 18,
+                        fontWeight: 800,
+                        color: '#7c3aed',
+                        letterSpacing: '3px',
+                        fontFamily: 'Inter, sans-serif',
+                        textTransform: 'uppercase',
+                        userSelect: 'none',
+                        flexShrink: 0,
+                      }}>
+                        Rifas Albeiro
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+
               {/* ── HEADER ─────────────────────────────── */}
               <div style={{
                 background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
@@ -342,6 +383,7 @@ export default function AdminTicket() {
                 textAlign: 'center',
                 position: 'relative',
                 overflow: 'hidden',
+                zIndex: 1,
               }}>
                 {/* Decorative subtle circles */}
                 <div style={{
@@ -377,7 +419,7 @@ export default function AdminTicket() {
               </div>
 
               {/* ── INFO SECTION ───────────────────────── */}
-              <div style={{ padding: '20px 24px 0' }}>
+              <div style={{ padding: '20px 24px 0', position: 'relative', zIndex: 1 }}>
 
                 {/* Comprador */}
                 <div style={{
@@ -426,7 +468,7 @@ export default function AdminTicket() {
               </div>
 
               {/* ── NOTCH DIVIDER ──────────────────────── */}
-              <div style={{ position: 'relative', height: 28, margin: '8px 0' }}>
+              <div style={{ position: 'relative', height: 28, margin: '8px 0', zIndex: 1 }}>
                 <div style={{
                   position: 'absolute', left: 28, right: 28, top: '50%',
                   borderTop: '2px dashed #e0e0e0',
@@ -444,7 +486,7 @@ export default function AdminTicket() {
               </div>
 
               {/* ── NUMBERS ────────────────────────────── */}
-              <div style={{ padding: '0 24px 22px' }}>
+              <div style={{ padding: '0 24px 22px', position: 'relative', zIndex: 1 }}>
                 <div style={{
                   fontSize: 11, fontWeight: 700, color: '#aaa',
                   textTransform: 'uppercase', letterSpacing: '0.18em',
@@ -484,6 +526,8 @@ export default function AdminTicket() {
                 padding: '14px 24px 16px',
                 borderTop: '1px solid #f0f0f0',
                 textAlign: 'center',
+                position: 'relative',
+                zIndex: 1,
               }}>
                 <div style={{ fontSize: 11, fontWeight: 500, color: '#777', lineHeight: 1.8 }}>
                   📍 Mercado Principal de Tovar, frente a la tienda de maquillaje
@@ -497,6 +541,8 @@ export default function AdminTicket() {
               <div style={{
                 height: 5,
                 background: 'linear-gradient(90deg, #7c3aed, #a78bfa, #7c3aed)',
+                position: 'relative',
+                zIndex: 1,
               }} />
             </div>
           </div>
