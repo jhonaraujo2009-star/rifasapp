@@ -18,6 +18,7 @@ import AdminCustomers from './pages/admin/AdminCustomers';
 import AdminSettings  from './pages/admin/AdminSettings';
 import AdminExport    from './pages/admin/AdminExport';
 import AdminTicket    from './pages/admin/AdminTicket';
+import AdminAgente    from './pages/admin/AdminAgente';
 
 export default function App() {
   return (
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="exportar"   element={<AdminExport />} />
             <Route path="ajustes"    element={<AdminSettings />} />
             <Route path="ticket"     element={<AdminTicket />} />
+            <Route path="agente"     element={<AdminAgente />} />
           </Route>
 
           {/* Fallback */}

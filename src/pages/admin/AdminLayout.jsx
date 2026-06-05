@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard, Grid3X3, Users, Download, Settings,
-  LogOut, Menu, X, ExternalLink, Ticket, ChevronRight
+  LogOut, Menu, X, ExternalLink, Ticket, ChevronRight, Bot
 } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -16,6 +16,7 @@ const NAV_LINKS = [
   { to: '/admin/exportar', icon: Download, label: 'Exportar' },
   { to: '/admin/ajustes', icon: Settings, label: 'Ajustes' },
   { to: '/admin/ticket', icon: Ticket, label: 'Ticket Virtual' },
+  { to: '/admin/agente', icon: Bot,    label: 'Agente IA' },
 ];
 
 export default function AdminLayout() {
