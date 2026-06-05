@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard, Grid3X3, Users, Download, Settings,
-  LogOut, Menu, X, ExternalLink, Ticket, ChevronRight, Bot
+  LogOut, Menu, X, ExternalLink, Ticket, ChevronRight, Bot, Home
 } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -50,7 +50,7 @@ export default function AdminLayout() {
     ? location.pathname === n.to
     : location.pathname.startsWith(n.to))?.label || 'Panel';
 
-  const Sidebar = ({ onClose }) => (
+  const Sidebar = () => (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#0d0b1e' }}>
       {/* Logo */}
       <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -106,7 +106,7 @@ export default function AdminLayout() {
         {storeId && (
           <>
             <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '12px 0' }} />
-            <a href={`/tienda/${storeId}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+            <a href={`/tienda/${storeId}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', display: 'block', marginBottom: 4 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: 500, border: '1px dashed rgba(255,255,255,0.1)', transition: 'all 0.2s' }}
                 onMouseEnter={e => { e.currentTarget.style.color = '#a78bfa'; e.currentTarget.style.borderColor = 'rgba(124,58,237,0.4)'; }}
                 onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}>
@@ -119,6 +119,17 @@ export default function AdminLayout() {
             </a>
           </>
         )}
+
+        <a href="/" style={{ textDecoration: 'none', display: 'block' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: 500, border: '1px solid rgba(16,185,129,0.15)', background: 'rgba(16,185,129,0.05)', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#6ee7b7'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.4)'; e.currentTarget.style.background = 'rgba(16,185,129,0.1)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.15)'; e.currentTarget.style.background = 'rgba(16,185,129,0.05)'; }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Home size={14} color="#10b981" />
+            </div>
+            Página principal
+          </div>
+        </a>
       </nav>
 
       {/* Logout */}
@@ -180,14 +191,20 @@ export default function AdminLayout() {
               {storeName && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{storeName}</div>}
             </div>
           </div>
-          {storeId && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <a href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#6ee7b7', fontSize: 12, fontWeight: 700, textDecoration: 'none', transition: 'all 0.18s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.2)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.1)'; }}>
+              <Home size={12} /> Inicio
+            </a>
+            {storeId && (
               <a href={`/tienda/${storeId}`} target="_blank" rel="noopener noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)', color: '#c4b5fd', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
                 <ExternalLink size={12} /> Ver tabla pública
               </a>
-            </div>
-          )}
+            )}
+          </div>
         </header>
 
         <main style={{ flex: 1, padding: '24px 20px', maxWidth: 1100, width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>

@@ -489,13 +489,12 @@ export default function StorePage() {
         }
       `}</style>
 
-      {/* ── Acceso Admin (discreto, footer) ────────── */}
-      <div
-        style={{ textAlign: 'center', padding: '28px 0 16px', opacity: 0, transition: 'opacity 0.3s' }}
-        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-        onMouseLeave={e => e.currentTarget.style.opacity = '0'}>
-        <Link to="/admin" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 10, background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.1)', color: '#6c757d', textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
-          <Lock size={12} /> Administrar
+      {/* ── Acceso Admin (visible, discreto en footer) ─── */}
+      <div style={{ textAlign: 'center', padding: '28px 0 16px' }}>
+        <Link to="/admin" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderRadius: 12, background: `linear-gradient(135deg, ${color}18, ${color}10)`, border: `1px solid ${color}30`, color: color, textDecoration: 'none', fontSize: 13, fontWeight: 700, transition: 'all 0.2s', boxShadow: `0 2px 8px ${color}20` }}
+          onMouseEnter={e => { e.currentTarget.style.background = `${color}25`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = `${color}18`; e.currentTarget.style.transform = 'translateY(0)'; }}>
+          <Lock size={13} /> Panel de Administración
         </Link>
       </div>
     </div>

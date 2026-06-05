@@ -1,86 +1,100 @@
 // =============================================================
-//  geminiAgent.js  —  SDK v0.24.1
-//  Tipos en minúscula ('object','array','string') requeridos
-//  por esta versión del SDK.
+//  geminiAgent.js — REST API directa (sin SDK)
+//  Evitamos los problemas de compatibilidad entre SDKs.
+//  Usamos fetch nativo contra la API v1beta con el modelo
+//  gemini-1.5-flash-001 (versión específica, no alias).
 // =============================================================
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const MODEL   = 'gemini-flash-latest';
+const BASE    = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}`;
 
 if (!API_KEY) {
-  console.error(
-    '⚠️ VITE_GEMINI_API_KEY no está definida.\n' +
-    'Asegúrate de tener un archivo .env en la raíz con:\n' +
-    'VITE_GEMINI_API_KEY=tu_clave\n' +
-    'Luego reinicia el servidor: npm run dev'
-  );
+  console.error('⚠️ VITE_GEMINI_API_KEY no definida. Reinicia npm run dev.');
 }
 
-const genAI = new GoogleGenerativeAI(API_KEY || '');
-
-/* ── Tools (tipos en lowercase para v0.24.x) ─────────────────── */
-const tools = [
+/* ── Declaraciones de funciones para la IA ───────────────────── */
+const FUNCTION_DECLARATIONS = [
   {
-    functionDeclarations: [
-      {
-        name: 'verificarDisponibilidad',
-        description:
-          'Verifica si los números de rifa indicados están disponibles, vendidos o apartados.',
-        parameters: {
-          type: 'object',
-          properties: {
-            numeros: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Números a consultar, ej: ["031","048"]',
-            },
-          },
-          required: ['numeros'],
+    name: 'verificarDisponibilidad',
+    description: 'Verifica si los números de rifa indicados están disponibles, vendidos o apartados.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        numeros: {
+          type: 'ARRAY',
+          items: { type: 'STRING' },
+          description: 'Números a consultar, ej: ["031","048"]',
         },
       },
-      {
-        name: 'actualizarEstadoNumeros',
-        description:
-          'Cambia el estado de uno o varios números de rifa a "vendido" o "disponible".',
-        parameters: {
-          type: 'object',
-          properties: {
-            numeros: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Números a actualizar',
-            },
-            estado: {
-              type: 'string',
-              enum: ['vendido', 'disponible'],
-              description: 'Nuevo estado',
-            },
-          },
-          required: ['numeros', 'estado'],
+      required: ['numeros'],
+    },
+  },
+  {
+    name: 'actualizarEstadoNumeros',
+    description: 'Cambia el estado de uno o varios números de rifa a "vendido" o "disponible".',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        numeros: {
+          type: 'ARRAY',
+          items: { type: 'STRING' },
+          description: 'Números a actualizar',
+        },
+        estado: {
+          type: 'STRING',
+          enum: ['vendido', 'disponible'],
+          description: 'Nuevo estado',
         },
       },
-      {
-        name: 'generarTicket',
-        description: 'Genera un ticket visual de compra para un cliente.',
-        parameters: {
-          type: 'object',
-          properties: {
-            nombre_comprador: {
-              type: 'string',
-              description: 'Nombre del comprador',
-            },
-            numeros: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Números comprados',
-            },
-          },
-          required: ['nombre_comprador', 'numeros'],
+      required: ['numeros', 'estado'],
+    },
+  },
+  {
+    name: 'generarTicket',
+    description: 'Genera un ticket visual de compra para un cliente.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        nombre_comprador: {
+          type: 'STRING',
+          description: 'Nombre del comprador',
+        },
+        numeros: {
+          type: 'ARRAY',
+          items: { type: 'STRING' },
+          description: 'Números comprados',
         },
       },
-    ],
+      required: ['nombre_comprador', 'numeros'],
+    },
   },
 ];
+
+/* ── Llamada a la API REST ───────────────────────────────────── */
+async function callGemini(contents, systemText) {
+  const body = {
+    systemInstruction: {
+      parts: [{ text: systemText }],
+    },
+    contents,
+    tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
+    generationConfig: { temperature: 0.2 },
+  };
+
+  const resp = await fetch(`${BASE}:generateContent?key=${API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json();
+    throw new Error(JSON.stringify(err));
+  }
+
+  return resp.json();
+}
 
 /**
  * Ejecuta el agente con texto o audio.
@@ -89,7 +103,7 @@ const tools = [
  * @param {string}  [params.audioBase64]
  * @param {string}  [params.audioMimeType]
  * @param {string}   params.rifaName
- * @param {Function} params.onFunctionCall  - async (name, args) => result
+ * @param {Function} params.onFunctionCall — async (name, args) => result
  * @returns {Promise<string>}
  */
 export async function runAgent({
@@ -100,58 +114,71 @@ export async function runAgent({
   onFunctionCall,
 }) {
   if (!API_KEY) {
-    throw new Error(
-      'API key no configurada. Reinicia el servidor dev (npm run dev) después de guardar el .env'
-    );
+    throw new Error('API key no configurada. Reinicia el servidor (npm run dev).');
   }
 
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    tools,
-    systemInstruction:
-      `Eres el asistente de administración de la rifa "${rifaName}". ` +
-      'Ayudas al administrador a verificar números, marcarlos como vendidos/disponibles y generar tickets. ' +
-      'Siempre responde en español. Los números van del 000 al 999. ' +
-      'Si el usuario dice "el 5", interpreta "005". ' +
-      'Confirma siempre la acción realizada con un mensaje claro y amigable.',
-  });
+  const systemText =
+    `Eres el asistente de administración de la rifa "${rifaName}". ` +
+    'Ayudas al administrador a verificar números, marcarlos como vendidos/disponibles y generar tickets. ' +
+    'Siempre responde en español. Los números van del 000 al 999. ' +
+    'Si el usuario dice "el 5", interpreta "005". ' +
+    'Confirma siempre la acción realizada con un mensaje claro y amigable.';
 
-  // Construir partes
-  const parts = [];
+  // Construir el primer mensaje del usuario
+  const firstParts = [];
   if (audioBase64 && audioMimeType) {
-    parts.push({ inlineData: { mimeType: audioMimeType, data: audioBase64 } });
-    parts.push({ text: 'Transcribe y ejecuta la acción indicada en el audio.' });
+    firstParts.push({ inlineData: { mimeType: audioMimeType, data: audioBase64 } });
+    firstParts.push({ text: 'Transcribe y ejecuta la acción indicada en el audio.' });
   } else {
-    parts.push({ text: textInput || '' });
+    firstParts.push({ text: textInput || '' });
   }
+
+  // Historial de conversación (multi-turn)
+  const contents = [
+    { role: 'user', parts: firstParts },
+  ];
 
   // Loop de Function Calling
-  const chat = model.startChat();
-  let resp = await chat.sendMessage(parts);
+  let maxIter = 10;
+  while (maxIter-- > 0) {
+    const data = await callGemini(contents, systemText);
+    const candidate = data.candidates?.[0];
 
-  let maxIter = 10; // seguridad anti-loop infinito
-  while (resp.response.functionCalls()?.length > 0 && maxIter-- > 0) {
-    const calls = resp.response.functionCalls();
-    const results = [];
+    if (!candidate) throw new Error('Respuesta vacía de Gemini');
 
-    for (const call of calls) {
+    const parts = candidate.content?.parts ?? [];
+
+    // Añadir la respuesta del modelo al historial
+    contents.push({ role: 'model', parts });
+
+    // ¿Hay llamadas a funciones?
+    const fnCalls = parts.filter(p => p.functionCall);
+
+    if (fnCalls.length === 0) {
+      // Respuesta de texto final
+      const textPart = parts.find(p => p.text);
+      return textPart?.text ?? '(sin respuesta)';
+    }
+
+    // Ejecutar cada función y construir las respuestas
+    const fnResponseParts = [];
+    for (const part of fnCalls) {
+      const { name, args } = part.functionCall;
       let result;
       try {
-        result = await onFunctionCall(call.name, call.args);
+        result = await onFunctionCall(name, args);
       } catch (err) {
-        console.error(`Error ejecutando ${call.name}:`, err);
+        console.error(`Error en ${name}:`, err);
         result = { error: err.message };
       }
-      results.push({
-        functionResponse: {
-          name: call.name,
-          response: { result },
-        },
+      fnResponseParts.push({
+        functionResponse: { name, response: { result } },
       });
     }
 
-    resp = await chat.sendMessage(results);
+    // Añadir resultados al historial y continuar
+    contents.push({ role: 'user', parts: fnResponseParts });
   }
 
-  return resp.response.text();
+  throw new Error('Se alcanzó el límite de iteraciones en Function Calling.');
 }
