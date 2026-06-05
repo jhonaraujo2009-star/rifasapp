@@ -297,21 +297,7 @@ export default function StorePage() {
               </button>
             </div>
 
-            {/* Leyenda */}
-            <div style={{ borderRadius: 16, border: '1px solid #e9ecef', background: '#fff', padding: '16px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-              <div style={{ fontSize: 10, fontWeight: 800, color: '#868e96', textTransform: 'uppercase', letterSpacing: '0.18em', marginBottom: 12 }}>Leyenda</div>
-              {[
-                { bg: '#fff', border: '#e5e7eb', text: '#374151', label: 'Disponible — puedes elegirlo' },
-                { bg: '#dcfce7', border: '#86efac', text: '#15803d', label: 'Apartado — esperando pago' },
-                { bg: '#fee2e2', border: '#fca5a5', text: '#b91c1c', label: 'Vendido — ya está tomado' },
-                { bg: 'linear-gradient(135deg,#7c3aed,#4f46e5)', border: '#7c3aed', text: '#fff', label: 'Tu selección actual' },
-              ].map(({ bg, border, text, label }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
-                  <span style={{ width: 24, height: 24, borderRadius: 7, background: bg, border: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: text, flexShrink: 0 }}>1</span>
-                  <span style={{ fontSize: 12, color: '#495057' }}>{label}</span>
-                </div>
-              ))}
-            </div>
+
           </div>
 
           {/* Grilla de números — ocupa todo el espacio restante */}
