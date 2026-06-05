@@ -391,16 +391,31 @@ export default function AdminAgente() {
       });
       setMessages(prev => [...prev, { id: Date.now(), role: 'agent', text: reply }]);
     } catch (err) {
-      console.error(err);
-      setMessages(prev => [...prev, { id: Date.now(), role: 'agent', text: '⚠️ Error al conectar con el agente. Verifica tu conexión.' }]);
+      console.error('Error agente:', err);
+      const errMsg = err?.message || String(err);
+      setMessages(prev => [...prev, {
+        id: Date.now(), role: 'agent',
+        text: `⚠️ Error: ${errMsg}\n\nSi el error menciona la API key, reinicia el servidor con: npm run dev`,
+      }]);
     } finally {
       setLoading(false);
     }
   };
 
-  /* ── Grabar audio ───────────────────────────────────────── */
-  const startRecording = async () => {
+  /* ── Grabar audio (toggle: clic para iniciar / clic para detener) ── */
+  const toggleRecording = async () => {
     if (loading) return;
+
+    // Si ya está grabando → detener y enviar
+    if (isRecording) {
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecording(false);
+      return;
+    }
+
+    // Iniciar grabación
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -408,6 +423,7 @@ export default function AdminAgente() {
         : 'audio/webm';
       const recorder = new MediaRecorder(stream, { mimeType });
       audioChunksRef.current = [];
+      const startTime = Date.now();
 
       recorder.ondataavailable = e => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
@@ -415,6 +431,13 @@ export default function AdminAgente() {
 
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
+
+        const duration = Date.now() - startTime;
+        if (duration < 800 || audioChunksRef.current.length === 0) {
+          toast.error('Grabación muy corta. Habla por al menos 1 segundo.');
+          return;
+        }
+
         const blob = new Blob(audioChunksRef.current, { type: mimeType });
         const base64 = await blobToBase64(blob);
 
@@ -430,8 +453,12 @@ export default function AdminAgente() {
           });
           setMessages(prev => [...prev, { id: Date.now(), role: 'agent', text: reply }]);
         } catch (err) {
-          console.error(err);
-          setMessages(prev => [...prev, { id: Date.now(), role: 'agent', text: '⚠️ No pude procesar el audio. Intenta de nuevo o escribe tu comando.' }]);
+          console.error('Error agente audio:', err);
+          const errMsg = err?.message || String(err);
+          setMessages(prev => [...prev, {
+            id: Date.now(), role: 'agent',
+            text: `⚠️ Error procesando audio: ${errMsg}`,
+          }]);
         } finally {
           setLoading(false);
         }
@@ -440,15 +467,9 @@ export default function AdminAgente() {
       recorder.start();
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
-    } catch {
-      toast.error('No se pudo acceder al micrófono');
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
+      toast.success('🎤 Grabando... Toca el micrófono de nuevo para enviar', { duration: 2000 });
+    } catch (err) {
+      toast.error('No se pudo acceder al micrófono: ' + err.message);
     }
   };
 
@@ -552,16 +573,13 @@ export default function AdminAgente() {
             />
           </div>
 
-          {/* Mic button */}
+          {/* Mic button — toggle */}
           <button
-            onMouseDown={startRecording}
-            onMouseUp={stopRecording}
-            onTouchStart={startRecording}
-            onTouchEnd={stopRecording}
+            onClick={toggleRecording}
             disabled={loading}
-            title="Mantén presionado para grabar"
+            title={isRecording ? 'Toca para enviar' : 'Toca para grabar'}
             style={{
-              width: 48, height: 48, borderRadius: 14, border: 'none', flexShrink: 0,
+              width: 48, height: 48, borderRadius: 14, flexShrink: 0,
               background: isRecording
                 ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
                 : 'rgba(255,255,255,0.07)',
@@ -570,7 +588,8 @@ export default function AdminAgente() {
               boxShadow: isRecording ? '0 0 20px rgba(220,38,38,0.5)' : 'none',
               transition: 'all 0.2s',
               opacity: loading ? 0.4 : 1,
-              border: isRecording ? 'none' : '1px solid rgba(255,255,255,0.1)',
+              border: isRecording ? '2px solid #dc2626' : '1px solid rgba(255,255,255,0.1)',
+              animation: isRecording ? 'micPulse 1s ease-in-out infinite' : 'none',
             }}
           >
             {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
@@ -596,7 +615,7 @@ export default function AdminAgente() {
         </div>
 
         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', margin: '8px 0 0', textAlign: 'center' }}>
-          Enter para enviar · Mantén 🎤 para hablar · Shift+Enter para nueva línea
+          Enter para enviar · {isRecording ? '🔴 Grabando — toca 🎤 de nuevo para enviar' : 'Toca 🎤 para grabar voz'} · Shift+Enter = nueva línea
         </p>
       </div>
 
@@ -625,9 +644,10 @@ export default function AdminAgente() {
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes micPulse {
+          0%, 100% { box-shadow: 0 0 10px rgba(220,38,38,0.5); }
+          50% { box-shadow: 0 0 25px rgba(220,38,38,0.9); }
         }
       `}</style>
     </div>
