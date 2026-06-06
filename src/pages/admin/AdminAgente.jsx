@@ -374,6 +374,21 @@ export default function AdminAgente() {
     return { error: `Función desconocida: ${name}` };
   }, [store]);
 
+  /* ── Hablar respuesta en audio (TTS) ────────────────────── */
+  const speakText = (text) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel(); // Detener si está hablando
+    
+    // Limpiar markdown básico para mejor lectura
+    const cleanText = text.replace(/[*_#]/g, '').trim();
+    if (!cleanText) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'es-ES'; // Español
+    utterance.rate = 1.05;    // Un poquito más rápido
+    window.speechSynthesis.speak(utterance);
+  };
+
   /* ── Enviar mensaje de texto ────────────────────────────── */
   const sendText = async () => {
     const text = input.trim();
@@ -390,6 +405,7 @@ export default function AdminAgente() {
         onFunctionCall,
       });
       setMessages(prev => [...prev, { id: Date.now(), role: 'agent', text: reply }]);
+      speakText(reply);
     } catch (err) {
       console.error('Error agente:', err);
       const errMsg = err?.message || String(err);
@@ -452,6 +468,7 @@ export default function AdminAgente() {
             onFunctionCall,
           });
           setMessages(prev => [...prev, { id: Date.now(), role: 'agent', text: reply }]);
+          speakText(reply);
         } catch (err) {
           console.error('Error agente audio:', err);
           const errMsg = err?.message || String(err);
