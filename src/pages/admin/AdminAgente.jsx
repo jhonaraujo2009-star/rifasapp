@@ -255,6 +255,7 @@ export default function AdminAgente() {
   const ticketDataRef    = useRef(null);   // almacena datos del ticket mientras el agente responde
   const ticketResolveRef = useRef(null);   // resolve de la promesa de captura
   const liveModeRef      = useRef(false);  // ref para acceder en callbacks
+  const conversationRef  = useRef([]);     // historial de conversación para Gemini
 
   /* ── Cargar tienda activa ───────────────────────────────── */
   useEffect(() => {
@@ -411,12 +412,14 @@ export default function AdminAgente() {
     setProgressText('💬 Enviando...');
 
     try {
-      const reply = await runAgent({
+      const { text: reply, history: newHistory } = await runAgent({
         textInput: text,
         rifaName: store?.nombre || 'Rifa activa',
         onFunctionCall,
         onProgress,
+        history: conversationRef.current,
       });
+      conversationRef.current = newHistory;
       setMessages(prev => [...prev, { id: Date.now(), role: 'agent', text: reply }]);
       speakText(reply);
     } catch (err) {
@@ -476,13 +479,15 @@ export default function AdminAgente() {
         setProgressText('🎤 Transcribiendo audio...');
 
         try {
-          const reply = await runAgent({
+          const { text: reply, history: newHistory } = await runAgent({
             audioBase64: base64,
             audioMimeType: mimeType,
             rifaName: store?.nombre || 'Rifa activa',
             onFunctionCall,
             onProgress,
+            history: conversationRef.current,
           });
+          conversationRef.current = newHistory;
           setMessages(prev => [...prev, { id: Date.now(), role: 'agent', text: reply }]);
           speakText(reply);
         } catch (err) {

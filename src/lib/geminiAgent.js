@@ -120,7 +120,8 @@ async function callGemini(contents, systemText) {
  * @param {string}   params.rifaName
  * @param {Function} params.onFunctionCall — async (name, args) => result
  * @param {Function} [params.onProgress]   — (stepText) => void  — progreso en tiempo real
- * @returns {Promise<string>}
+ * @param {Array}    [params.history]      — historial previo de conversación
+ * @returns {Promise<{text: string, history: Array}>}  — respuesta + historial actualizado
  */
 export async function runAgent({
   textInput,
@@ -129,6 +130,7 @@ export async function runAgent({
   rifaName,
   onFunctionCall,
   onProgress,
+  history = [],
 }) {
   if (!API_KEY) {
     throw new Error('API key no configurada. Reinicia el servidor (npm run dev).');
@@ -142,9 +144,10 @@ export async function runAgent({
     'Siempre responde en español. Los números van del 000 al 999. ' +
     'Si el usuario dice "el 5", interpreta "005". ' +
     'Responde de forma breve y directa. ' +
+    'Si el usuario se refiere a algo mencionado antes en la conversación (como "esos números"), recuerda el contexto. ' +
     'Confirma siempre la acción realizada con un mensaje claro y amigable.';
 
-  // Construir el primer mensaje del usuario
+  // Construir el mensaje actual del usuario
   const firstParts = [];
   if (audioBase64 && audioMimeType) {
     progress('🎤 Transcribiendo audio...');
@@ -155,8 +158,11 @@ export async function runAgent({
     firstParts.push({ text: textInput || '' });
   }
 
-  // Historial de conversación (multi-turn)
+  // Historial de conversación: mensajes anteriores + mensaje actual
+  // Limitar historial a los últimos 20 mensajes para no exceder el contexto
+  const trimmedHistory = history.slice(-20);
   const contents = [
+    ...trimmedHistory,
     { role: 'user', parts: firstParts },
   ];
 
@@ -181,7 +187,8 @@ export async function runAgent({
       // Respuesta de texto final
       progress('✅ Listo');
       const textPart = parts.find(p => p.text);
-      return textPart?.text ?? '(sin respuesta)';
+      const replyText = textPart?.text ?? '(sin respuesta)';
+      return { text: replyText, history: contents };
     }
 
     // Ejecutar cada función y construir las respuestas
