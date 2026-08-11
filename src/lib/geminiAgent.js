@@ -7,7 +7,7 @@
 // =============================================================
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const MODEL   = 'gemini-2.5-flash';
+const MODEL   = 'gemini-flash-lite-latest';
 const BASE    = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}`;
 const TIMEOUT = 15000; // 15 segundos máximo por llamada
 
