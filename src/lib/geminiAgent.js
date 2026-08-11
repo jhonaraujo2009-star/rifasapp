@@ -1,13 +1,15 @@
 // =============================================================
 //  geminiAgent.js — REST API directa (sin SDK)
-//  Evitamos los problemas de compatibilidad entre SDKs.
-//  Usamos fetch nativo contra la API v1beta con el modelo
-//  gemini-1.5-flash-001 (versión específica, no alias).
+//  ✅ Optimizado:
+//    - Modelo: gemini-2.5-flash (más rápido e inteligente)
+//    - Timeout: 15 segundos por llamada (no se queda pegado)
+//    - Callbacks de progreso en tiempo real
 // =============================================================
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const MODEL   = 'gemini-flash-lite-latest';
+const MODEL   = 'gemini-2.5-flash';
 const BASE    = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}`;
+const TIMEOUT = 15000; // 15 segundos máximo por llamada
 
 if (!API_KEY) {
   console.error('⚠️ VITE_GEMINI_API_KEY no definida. Reinicia npm run dev.');
@@ -71,7 +73,7 @@ const FUNCTION_DECLARATIONS = [
   },
 ];
 
-/* ── Llamada a la API REST ───────────────────────────────────── */
+/* ── Llamada a la API REST con timeout ──────────────────────── */
 async function callGemini(contents, systemText) {
   const body = {
     systemInstruction: {
@@ -82,18 +84,31 @@ async function callGemini(contents, systemText) {
     generationConfig: { temperature: 0.2 },
   };
 
-  const resp = await fetch(`${BASE}:generateContent?key=${API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT);
 
-  if (!resp.ok) {
-    const err = await resp.json();
-    throw new Error(JSON.stringify(err));
+  try {
+    const resp = await fetch(`${BASE}:generateContent?key=${API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(JSON.stringify(err));
+    }
+
+    return resp.json();
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('⏱️ Gemini tardó demasiado en responder (más de 15 segundos). Intenta de nuevo.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-
-  return resp.json();
 }
 
 /**
@@ -104,6 +119,7 @@ async function callGemini(contents, systemText) {
  * @param {string}  [params.audioMimeType]
  * @param {string}   params.rifaName
  * @param {Function} params.onFunctionCall — async (name, args) => result
+ * @param {Function} [params.onProgress]   — (stepText) => void  — progreso en tiempo real
  * @returns {Promise<string>}
  */
 export async function runAgent({
@@ -112,24 +128,30 @@ export async function runAgent({
   audioMimeType,
   rifaName,
   onFunctionCall,
+  onProgress,
 }) {
   if (!API_KEY) {
     throw new Error('API key no configurada. Reinicia el servidor (npm run dev).');
   }
+
+  const progress = onProgress || (() => {});
 
   const systemText =
     `Eres el asistente de administración de la rifa "${rifaName}". ` +
     'Ayudas al administrador a verificar números, marcarlos como vendidos/disponibles y generar tickets. ' +
     'Siempre responde en español. Los números van del 000 al 999. ' +
     'Si el usuario dice "el 5", interpreta "005". ' +
+    'Responde de forma breve y directa. ' +
     'Confirma siempre la acción realizada con un mensaje claro y amigable.';
 
   // Construir el primer mensaje del usuario
   const firstParts = [];
   if (audioBase64 && audioMimeType) {
+    progress('🎤 Transcribiendo audio...');
     firstParts.push({ inlineData: { mimeType: audioMimeType, data: audioBase64 } });
     firstParts.push({ text: 'Transcribe y ejecuta la acción indicada en el audio.' });
   } else {
+    progress('💬 Enviando mensaje...');
     firstParts.push({ text: textInput || '' });
   }
 
@@ -141,6 +163,7 @@ export async function runAgent({
   // Loop de Function Calling
   let maxIter = 10;
   while (maxIter-- > 0) {
+    progress('🧠 Pensando...');
     const data = await callGemini(contents, systemText);
     const candidate = data.candidates?.[0];
 
@@ -156,6 +179,7 @@ export async function runAgent({
 
     if (fnCalls.length === 0) {
       // Respuesta de texto final
+      progress('✅ Listo');
       const textPart = parts.find(p => p.text);
       return textPart?.text ?? '(sin respuesta)';
     }
@@ -164,6 +188,13 @@ export async function runAgent({
     const fnResponseParts = [];
     for (const part of fnCalls) {
       const { name, args } = part.functionCall;
+      const friendlyNames = {
+        verificarDisponibilidad: '🔍 Consultando números...',
+        actualizarEstadoNumeros: '✏️ Actualizando estado...',
+        generarTicket: '🎫 Generando ticket...',
+      };
+      progress(friendlyNames[name] || `⚙️ Ejecutando ${name}...`);
+
       let result;
       try {
         result = await onFunctionCall(name, args);
@@ -178,6 +209,7 @@ export async function runAgent({
 
     // Añadir resultados al historial y continuar
     contents.push({ role: 'user', parts: fnResponseParts });
+    progress('🧠 Generando respuesta...');
   }
 
   throw new Error('Se alcanzó el límite de iteraciones en Function Calling.');

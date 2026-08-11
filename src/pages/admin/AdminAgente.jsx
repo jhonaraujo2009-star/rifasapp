@@ -245,6 +245,8 @@ export default function AdminAgente() {
   const [loading, setLoading]       = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [pendingTicket, setPendingTicket] = useState(null); // { nombre, numeros }
+  const [liveMode, setLiveMode]     = useState(false);     // modo walkie-talkie
+  const [progressText, setProgressText] = useState('');    // indicador de paso actual
 
   const messagesEndRef   = useRef(null);
   const hiddenTicketRef  = useRef(null);
@@ -252,6 +254,7 @@ export default function AdminAgente() {
   const audioChunksRef   = useRef([]);
   const ticketDataRef    = useRef(null);   // almacena datos del ticket mientras el agente responde
   const ticketResolveRef = useRef(null);   // resolve de la promesa de captura
+  const liveModeRef      = useRef(false);  // ref para acceder en callbacks
 
   /* ── Cargar tienda activa ───────────────────────────────── */
   useEffect(() => {
@@ -377,17 +380,25 @@ export default function AdminAgente() {
   /* ── Hablar respuesta en audio (TTS) ────────────────────── */
   const speakText = (text) => {
     if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); // Detener si está hablando
-    
-    // Limpiar markdown básico para mejor lectura
-    const cleanText = text.replace(/[*_#]/g, '').trim();
+    window.speechSynthesis.cancel();
+    const cleanText = text.replace(/[*_#⚠️✅🔍✏️🎫⏱️💬🎤🧠]/g, '').trim();
     if (!cleanText) return;
-
     const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = 'es-ES'; // Español
-    utterance.rate = 1.05;    // Un poquito más rápido
+    utterance.lang = 'es-ES';
+    utterance.rate = 1.05;
+    // En modo en vivo, re-iniciar grabación cuando termine de hablar
+    if (liveModeRef.current) {
+      utterance.onend = () => {
+        setTimeout(() => {
+          if (liveModeRef.current) startRecording();
+        }, 500);
+      };
+    }
     window.speechSynthesis.speak(utterance);
   };
+
+  /* ── Callback de progreso visual ───────────────────────── */
+  const onProgress = (step) => setProgressText(step);
 
   /* ── Enviar mensaje de texto ────────────────────────────── */
   const sendText = async () => {
@@ -397,12 +408,14 @@ export default function AdminAgente() {
 
     setMessages(prev => [...prev, { id: Date.now(), role: 'user', text }]);
     setLoading(true);
+    setProgressText('💬 Enviando...');
 
     try {
       const reply = await runAgent({
         textInput: text,
         rifaName: store?.nombre || 'Rifa activa',
         onFunctionCall,
+        onProgress,
       });
       setMessages(prev => [...prev, { id: Date.now(), role: 'agent', text: reply }]);
       speakText(reply);
@@ -415,23 +428,13 @@ export default function AdminAgente() {
       }]);
     } finally {
       setLoading(false);
+      setProgressText('');
     }
   };
 
-  /* ── Grabar audio (toggle: clic para iniciar / clic para detener) ── */
-  const toggleRecording = async () => {
+  /* ── Iniciar grabación (reutilizado por toggle y modo en vivo) ── */
+  const startRecording = async () => {
     if (loading) return;
-
-    // Si ya está grabando → detener y enviar
-    if (isRecording) {
-      if (mediaRecorderRef.current?.state === 'recording') {
-        mediaRecorderRef.current.stop();
-      }
-      setIsRecording(false);
-      return;
-    }
-
-    // Iniciar grabación
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -451,6 +454,8 @@ export default function AdminAgente() {
         const duration = Date.now() - startTime;
         if (duration < 800 || audioChunksRef.current.length === 0) {
           toast.error('Grabación muy corta. Habla por al menos 1 segundo.');
+          // En modo en vivo, reiniciar grabación
+          if (liveModeRef.current) setTimeout(() => startRecording(), 600);
           return;
         }
 
@@ -459,6 +464,7 @@ export default function AdminAgente() {
 
         setMessages(prev => [...prev, { id: Date.now(), role: 'user', text: '', type: 'audio' }]);
         setLoading(true);
+        setProgressText('🎤 Transcribiendo audio...');
 
         try {
           const reply = await runAgent({
@@ -466,6 +472,7 @@ export default function AdminAgente() {
             audioMimeType: mimeType,
             rifaName: store?.nombre || 'Rifa activa',
             onFunctionCall,
+            onProgress,
           });
           setMessages(prev => [...prev, { id: Date.now(), role: 'agent', text: reply }]);
           speakText(reply);
@@ -476,17 +483,58 @@ export default function AdminAgente() {
             id: Date.now(), role: 'agent',
             text: `⚠️ Error procesando audio: ${errMsg}`,
           }]);
+          // En modo en vivo, reiniciar grabación incluso tras error
+          if (liveModeRef.current) setTimeout(() => startRecording(), 1000);
         } finally {
           setLoading(false);
+          setProgressText('');
         }
       };
 
       recorder.start();
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
-      toast.success('🎤 Grabando... Toca el micrófono de nuevo para enviar', { duration: 2000 });
     } catch (err) {
       toast.error('No se pudo acceder al micrófono: ' + err.message);
+      if (liveModeRef.current) {
+        setLiveMode(false);
+        liveModeRef.current = false;
+      }
+    }
+  };
+
+  /* ── Toggle grabación (modo manual) ──────────────────────── */
+  const toggleRecording = async () => {
+    if (loading) return;
+    if (isRecording) {
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecording(false);
+      return;
+    }
+    await startRecording();
+    toast.success('🎤 Grabando... Toca el micrófono de nuevo para enviar', { duration: 2000 });
+  };
+
+  /* ── Toggle modo en vivo ────────────────────────────────── */
+  const toggleLiveMode = async () => {
+    if (liveMode) {
+      // Apagar
+      setLiveMode(false);
+      liveModeRef.current = false;
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecording(false);
+      window.speechSynthesis?.cancel();
+      toast('🔇 Modo en vivo desactivado', { icon: '⏹️', duration: 2000 });
+    } else {
+      // Encender
+      setLiveMode(true);
+      liveModeRef.current = true;
+      toast.success('🟢 Modo en vivo activado — Habla cuando quieras', { duration: 3000 });
+      await startRecording();
     }
   };
 
@@ -543,7 +591,7 @@ export default function AdminAgente() {
           <MessageBubble key={msg.id} msg={msg} onDownload={handleDownload} />
         ))}
 
-        {/* Indicador de carga */}
+        {/* Indicador de carga con progreso */}
         {loading && (
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 18 }}>
             <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -551,7 +599,7 @@ export default function AdminAgente() {
             </div>
             <div style={{ padding: '12px 16px', borderRadius: '4px 16px 16px 16px', background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.2)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Loader2 size={16} color="#a78bfa" style={{ animation: 'spin 1s linear infinite' }} />
-              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Procesando...</span>
+              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>{progressText || 'Procesando...'}</span>
             </div>
           </div>
         )}
@@ -631,9 +679,35 @@ export default function AdminAgente() {
           </button>
         </div>
 
-        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', margin: '8px 0 0', textAlign: 'center' }}>
-          Enter para enviar · {isRecording ? '🔴 Grabando — toca 🎤 de nuevo para enviar' : 'Toca 🎤 para grabar voz'} · Shift+Enter = nueva línea
-        </p>
+        {/* Modo en vivo toggle + estado */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, padding: '0 4px' }}>
+          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', margin: 0 }}>
+            {isRecording ? '🔴 Grabando...' : liveMode ? '🟢 En vivo — esperando...' : 'Enter enviar · 🎤 grabar voz'}
+          </p>
+
+          {/* Switch de modo en vivo */}
+          <button
+            onClick={toggleLiveMode}
+            disabled={loading}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 12px', borderRadius: 20,
+              background: liveMode ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${liveMode ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.1)'}`,
+              color: liveMode ? '#6ee7b7' : 'rgba(255,255,255,0.3)',
+              fontSize: 11, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: liveMode ? '#10b981' : 'rgba(255,255,255,0.2)',
+              boxShadow: liveMode ? '0 0 8px #10b981' : 'none',
+              animation: liveMode ? 'pulse 2s infinite' : 'none',
+            }} />
+            {liveMode ? 'EN VIVO' : 'Modo en vivo'}
+          </button>
+        </div>
       </div>
 
       {/* ── Ticket oculto para captura ────────────────────────

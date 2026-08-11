@@ -3,6 +3,8 @@
 //  Funciones reales que el agente Gemini invoca via Function Calling.
 //  Se conectan directamente a tu Firestore.
 //  Los IDs de tickets siguen el formato: {storeId}_{000-999}
+//
+//  ✅ Optimizado: consultas en PARALELO con Promise.all
 // =============================================================
 import { db } from '../firebase';
 import {
@@ -11,18 +13,16 @@ import {
 
 /**
  * Verifica la disponibilidad de uno o varios números de rifa.
+ * ✅ Ahora usa Promise.all — consulta todos al mismo tiempo.
  * @param {string} storeId - ID de la tienda activa
  * @param {string[]} numeros - Array de números como strings (ej: ["031","048"])
  * @returns {Promise<Array>} Lista con el estado de cada número
  */
 export async function verificarDisponibilidad(storeId, numeros) {
-  const results = [];
-
-  for (const num of numeros) {
+  const promises = numeros.map(async (num) => {
     const n = parseInt(num, 10);
     if (isNaN(n) || n < 0 || n > 999) {
-      results.push({ numero: num, estado: 'inválido', mensaje: 'Número fuera de rango (0-999)' });
-      continue;
+      return { numero: num, estado: 'inválido', mensaje: 'Número fuera de rango (0-999)' };
     }
     const padded = String(n).padStart(3, '0');
     const ticketId = `${storeId}_${padded}`;
@@ -31,20 +31,20 @@ export async function verificarDisponibilidad(storeId, numeros) {
       const snap = await getDoc(doc(db, 'tickets', ticketId));
       if (snap.exists()) {
         const data = snap.data();
-        results.push({
+        return {
           numero: padded,
           estado: data.estado || 'disponible',
           cliente: data.cliente_nombre || null,
-        });
+        };
       } else {
-        results.push({ numero: padded, estado: 'no encontrado' });
+        return { numero: padded, estado: 'no encontrado' };
       }
     } catch (e) {
-      results.push({ numero: padded, estado: 'error', mensaje: e.message });
+      return { numero: padded, estado: 'error', mensaje: e.message };
     }
-  }
+  });
 
-  return results;
+  return Promise.all(promises);
 }
 
 /**
