@@ -433,6 +433,9 @@ export default function AdminAgente() {
   };
 
   /* ── Iniciar grabación (reutilizado por toggle y modo en vivo) ── */
+  const silenceTimerRef = useRef(null);
+  const audioContextRef = useRef(null);
+
   const startRecording = async () => {
     if (loading) return;
     try {
@@ -449,11 +452,16 @@ export default function AdminAgente() {
       };
 
       recorder.onstop = async () => {
+        // Limpiar detección de silencio
+        if (silenceTimerRef.current) clearInterval(silenceTimerRef.current);
+        if (audioContextRef.current) {
+          try { audioContextRef.current.close(); } catch (_) {}
+          audioContextRef.current = null;
+        }
         stream.getTracks().forEach(t => t.stop());
 
         const duration = Date.now() - startTime;
         if (duration < 800 || audioChunksRef.current.length === 0) {
-          toast.error('Grabación muy corta. Habla por al menos 1 segundo.');
           // En modo en vivo, reiniciar grabación
           if (liveModeRef.current) setTimeout(() => startRecording(), 600);
           return;
@@ -464,6 +472,7 @@ export default function AdminAgente() {
 
         setMessages(prev => [...prev, { id: Date.now(), role: 'user', text: '', type: 'audio' }]);
         setLoading(true);
+        setIsRecording(false);
         setProgressText('🎤 Transcribiendo audio...');
 
         try {
@@ -491,9 +500,62 @@ export default function AdminAgente() {
         }
       };
 
-      recorder.start();
+      recorder.start(250); // chunks cada 250ms para capturar bien
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
+
+      /* ── Detección de silencio para modo en vivo ────────────
+         Usa Web Audio API para medir el volumen del micrófono.
+         Si hay silencio por 1.5 segundos → auto-detiene y envía.
+      ──────────────────────────────────────────────────────── */
+      if (liveModeRef.current) {
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          audioContextRef.current = audioCtx;
+          const source = audioCtx.createMediaStreamSource(stream);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 512;
+          analyser.smoothingTimeConstant = 0.3;
+          source.connect(analyser);
+
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          const SILENCE_THRESHOLD = 15;  // nivel de volumen bajo = silencio
+          const SILENCE_DURATION  = 1500; // 1.5 segundos de silencio
+          let silenceStart = null;
+          let hasSpoken = false; // asegurar que habló al menos una vez
+
+          silenceTimerRef.current = setInterval(() => {
+            if (recorder.state !== 'recording') {
+              clearInterval(silenceTimerRef.current);
+              return;
+            }
+
+            analyser.getByteFrequencyData(dataArray);
+            // Promedio del volumen
+            const avg = dataArray.reduce((sum, v) => sum + v, 0) / dataArray.length;
+
+            if (avg > SILENCE_THRESHOLD) {
+              // Está hablando
+              hasSpoken = true;
+              silenceStart = null;
+            } else if (hasSpoken) {
+              // Silencio después de haber hablado
+              if (!silenceStart) {
+                silenceStart = Date.now();
+              } else if (Date.now() - silenceStart > SILENCE_DURATION) {
+                // 1.5s de silencio → enviar automáticamente
+                clearInterval(silenceTimerRef.current);
+                if (recorder.state === 'recording') {
+                  recorder.stop();
+                }
+              }
+            }
+          }, 100); // revisar cada 100ms
+        } catch (err) {
+          console.warn('Detección de silencio no disponible:', err);
+          // Si falla el AudioContext, el modo en vivo funciona pero sin auto-detección
+        }
+      }
     } catch (err) {
       toast.error('No se pudo acceder al micrófono: ' + err.message);
       if (liveModeRef.current) {
