@@ -112,11 +112,9 @@ async function callGemini(contents, systemText) {
 }
 
 /**
- * Ejecuta el agente con texto o audio.
+ * Ejecuta el agente con texto.
  * @param {Object} params
- * @param {string}  [params.textInput]
- * @param {string}  [params.audioBase64]
- * @param {string}  [params.audioMimeType]
+ * @param {string}   params.textInput
  * @param {string}   params.rifaName
  * @param {Function} params.onFunctionCall — async (name, args) => result
  * @param {Function} [params.onProgress]   — (stepText) => void  — progreso en tiempo real
@@ -125,8 +123,6 @@ async function callGemini(contents, systemText) {
  */
 export async function runAgent({
   textInput,
-  audioBase64,
-  audioMimeType,
   rifaName,
   onFunctionCall,
   onProgress,
@@ -148,15 +144,8 @@ export async function runAgent({
     'Confirma siempre la acción realizada con un mensaje claro y amigable.';
 
   // Construir el mensaje actual del usuario
-  const firstParts = [];
-  if (audioBase64 && audioMimeType) {
-    progress('🎤 Transcribiendo audio...');
-    firstParts.push({ inlineData: { mimeType: audioMimeType, data: audioBase64 } });
-    firstParts.push({ text: 'Transcribe y ejecuta la acción indicada en el audio.' });
-  } else {
-    progress('💬 Enviando mensaje...');
-    firstParts.push({ text: textInput || '' });
-  }
+  progress('💬 Procesando mensaje...');
+  const firstParts = [{ text: textInput || '' }];
 
   // Historial de conversación: mensajes anteriores + mensaje actual
   // Limitar historial a los últimos 20 mensajes para no exceder el contexto

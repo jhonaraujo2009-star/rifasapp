@@ -250,8 +250,7 @@ export default function AdminAgente() {
 
   const messagesEndRef   = useRef(null);
   const hiddenTicketRef  = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef   = useRef([]);
+  const recognitionRef   = useRef(null);
   const ticketDataRef    = useRef(null);   // almacena datos del ticket mientras el agente responde
   const ticketResolveRef = useRef(null);   // resolve de la promesa de captura
   const liveModeRef      = useRef(false);  // ref para acceder en callbacks
@@ -435,53 +434,43 @@ export default function AdminAgente() {
     }
   };
 
-  /* ── Iniciar grabación (reutilizado por toggle y modo en vivo) ── */
-  const silenceTimerRef = useRef(null);
-  const audioContextRef = useRef(null);
-
-  const startRecording = async () => {
+  /* ── Iniciar grabación (SpeechRecognition) ── */
+  const startRecording = () => {
     if (loading) return;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm';
-      const recorder = new MediaRecorder(stream, { mimeType });
-      audioChunksRef.current = [];
-      const startTime = Date.now();
 
-      recorder.ondataavailable = e => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error('Tu navegador no soporta reconocimiento de voz. Usa Chrome.');
+      if (liveModeRef.current) {
+        setLiveMode(false);
+        liveModeRef.current = false;
+      }
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'es-ES';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        setIsRecording(true);
       };
 
-      recorder.onstop = async () => {
-        // Limpiar detección de silencio
-        if (silenceTimerRef.current) clearInterval(silenceTimerRef.current);
-        if (audioContextRef.current) {
-          try { audioContextRef.current.close(); } catch (_) {}
-          audioContextRef.current = null;
-        }
-        stream.getTracks().forEach(t => t.stop());
+      recognition.onresult = async (event) => {
+        const transcript = event.results[0][0].transcript;
+        if (!transcript.trim()) return;
 
-        const duration = Date.now() - startTime;
-        if (duration < 800 || audioChunksRef.current.length === 0) {
-          // En modo en vivo, reiniciar grabación
-          if (liveModeRef.current) setTimeout(() => startRecording(), 600);
-          return;
-        }
-
-        const blob = new Blob(audioChunksRef.current, { type: mimeType });
-        const base64 = await blobToBase64(blob);
-
-        setMessages(prev => [...prev, { id: Date.now(), role: 'user', text: '', type: 'audio' }]);
+        // Mostrar lo que el usuario dijo
+        setMessages(prev => [...prev, { id: Date.now(), role: 'user', text: transcript }]);
         setLoading(true);
         setIsRecording(false);
-        setProgressText('🎤 Transcribiendo audio...');
+        setProgressText('💬 Pensando...');
 
         try {
           const { text: reply, history: newHistory } = await runAgent({
-            audioBase64: base64,
-            audioMimeType: mimeType,
+            textInput: transcript, // Enviamos como texto normal
             rifaName: store?.nombre || 'Rifa activa',
             onFunctionCall,
             onProgress,
@@ -491,11 +480,11 @@ export default function AdminAgente() {
           setMessages(prev => [...prev, { id: Date.now(), role: 'agent', text: reply }]);
           speakText(reply);
         } catch (err) {
-          console.error('Error agente audio:', err);
+          console.error('Error agente voz:', err);
           const errMsg = err?.message || String(err);
           setMessages(prev => [...prev, {
             id: Date.now(), role: 'agent',
-            text: `⚠️ Error procesando audio: ${errMsg}`,
+            text: `⚠️ Error: ${errMsg}`,
           }]);
           // En modo en vivo, reiniciar grabación incluso tras error
           if (liveModeRef.current) setTimeout(() => startRecording(), 1000);
@@ -505,64 +494,32 @@ export default function AdminAgente() {
         }
       };
 
-      recorder.start(250); // chunks cada 250ms para capturar bien
-      mediaRecorderRef.current = recorder;
-      setIsRecording(true);
+      recognition.onspeechend = () => {
+        recognition.stop();
+      };
 
-      /* ── Detección de silencio para modo en vivo ────────────
-         Usa Web Audio API para medir el volumen del micrófono.
-         Si hay silencio por 1.5 segundos → auto-detiene y envía.
-      ──────────────────────────────────────────────────────── */
-      if (liveModeRef.current) {
-        try {
-          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          audioContextRef.current = audioCtx;
-          const source = audioCtx.createMediaStreamSource(stream);
-          const analyser = audioCtx.createAnalyser();
-          analyser.fftSize = 512;
-          analyser.smoothingTimeConstant = 0.3;
-          source.connect(analyser);
-
-          const dataArray = new Uint8Array(analyser.frequencyBinCount);
-          const SILENCE_THRESHOLD = 15;  // nivel de volumen bajo = silencio
-          const SILENCE_DURATION  = 1500; // 1.5 segundos de silencio
-          let silenceStart = null;
-          let hasSpoken = false; // asegurar que habló al menos una vez
-
-          silenceTimerRef.current = setInterval(() => {
-            if (recorder.state !== 'recording') {
-              clearInterval(silenceTimerRef.current);
-              return;
-            }
-
-            analyser.getByteFrequencyData(dataArray);
-            // Promedio del volumen
-            const avg = dataArray.reduce((sum, v) => sum + v, 0) / dataArray.length;
-
-            if (avg > SILENCE_THRESHOLD) {
-              // Está hablando
-              hasSpoken = true;
-              silenceStart = null;
-            } else if (hasSpoken) {
-              // Silencio después de haber hablado
-              if (!silenceStart) {
-                silenceStart = Date.now();
-              } else if (Date.now() - silenceStart > SILENCE_DURATION) {
-                // 1.5s de silencio → enviar automáticamente
-                clearInterval(silenceTimerRef.current);
-                if (recorder.state === 'recording') {
-                  recorder.stop();
-                }
-              }
-            }
-          }, 100); // revisar cada 100ms
-        } catch (err) {
-          console.warn('Detección de silencio no disponible:', err);
-          // Si falla el AudioContext, el modo en vivo funciona pero sin auto-detección
+      recognition.onerror = (event) => {
+        if (event.error === 'no-speech' && liveModeRef.current) {
+          // Si no habló, reiniciar en modo en vivo
+          setTimeout(() => startRecording(), 500);
+          return;
         }
-      }
+        console.error('Error reconocimiento:', event.error);
+        setIsRecording(false);
+        if (liveModeRef.current) {
+          setLiveMode(false);
+          liveModeRef.current = false;
+        }
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
     } catch (err) {
-      toast.error('No se pudo acceder al micrófono: ' + err.message);
+      toast.error('No se pudo iniciar el micrófono: ' + err.message);
       if (liveModeRef.current) {
         setLiveMode(false);
         liveModeRef.current = false;
@@ -571,27 +528,27 @@ export default function AdminAgente() {
   };
 
   /* ── Toggle grabación (modo manual) ──────────────────────── */
-  const toggleRecording = async () => {
+  const toggleRecording = () => {
     if (loading) return;
     if (isRecording) {
-      if (mediaRecorderRef.current?.state === 'recording') {
-        mediaRecorderRef.current.stop();
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
       }
       setIsRecording(false);
       return;
     }
-    await startRecording();
-    toast.success('🎤 Grabando... Toca el micrófono de nuevo para enviar', { duration: 2000 });
+    startRecording();
+    toast.success('🎤 Habla ahora...', { duration: 2000 });
   };
 
   /* ── Toggle modo en vivo ────────────────────────────────── */
-  const toggleLiveMode = async () => {
+  const toggleLiveMode = () => {
     if (liveMode) {
       // Apagar
       setLiveMode(false);
       liveModeRef.current = false;
-      if (mediaRecorderRef.current?.state === 'recording') {
-        mediaRecorderRef.current.stop();
+      if (recognitionRef.current) {
+        recognitionRef.current.abort(); // Detener sin procesar resultado
       }
       setIsRecording(false);
       window.speechSynthesis?.cancel();
@@ -601,7 +558,7 @@ export default function AdminAgente() {
       setLiveMode(true);
       liveModeRef.current = true;
       toast.success('🟢 Modo en vivo activado — Habla cuando quieras', { duration: 3000 });
-      await startRecording();
+      startRecording();
     }
   };
 
