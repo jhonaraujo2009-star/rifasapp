@@ -335,15 +335,15 @@ export default function AdminAgente() {
     }
 
     if (name === 'actualizarEstadoNumeros') {
-      const { numeros = [], estado } = args;
-      const result = await actualizarEstadoNumeros(store.id, numeros, estado);
+      const { numeros = [], estado, nombre_comprador } = args;
+      const result = await actualizarEstadoNumeros(store.id, numeros, estado, nombre_comprador);
       setMessages(prev => [
         ...prev,
         {
           id: Date.now(), role: 'agent', text: '',
           actions: [{
             ok: true,
-            label: `${estado === 'vendido' ? '✅ Marcados vendidos' : '🔄 Marcados disponibles'}: ${numeros.join(', ')}`,
+            label: `${estado === 'vendido' ? '✅ Marcados vendidos' : '🔄 Marcados disponibles'}: ${numeros.join(', ')}${nombre_comprador ? ` → ${nombre_comprador}` : ''}`,
           }],
         },
       ]);

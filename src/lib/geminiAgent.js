@@ -34,7 +34,7 @@ const FUNCTION_DECLARATIONS = [
   },
   {
     name: 'actualizarEstadoNumeros',
-    description: 'Cambia el estado de uno o varios números de rifa a "vendido" o "disponible".',
+    description: 'Cambia el estado de uno o varios números de rifa a "vendido" o "disponible". Si el usuario menciona el nombre del comprador (ej: "a nombre de Daniel Lara"), incluirlo en nombre_comprador.',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -47,6 +47,10 @@ const FUNCTION_DECLARATIONS = [
           type: 'STRING',
           enum: ['vendido', 'disponible'],
           description: 'Nuevo estado',
+        },
+        nombre_comprador: {
+          type: 'STRING',
+          description: 'Nombre de la persona que compra los números. Solo cuando el estado es "vendido" y el usuario lo menciona.',
         },
       },
       required: ['numeros', 'estado'],
@@ -141,7 +145,10 @@ export async function runAgent({
     'Si el usuario dice "el 5", interpreta "005". ' +
     'Responde de forma breve y directa. ' +
     'Si el usuario se refiere a algo mencionado antes en la conversación (como "esos números"), recuerda el contexto. ' +
-    'Confirma siempre la acción realizada con un mensaje claro y amigable.';
+    'IMPORTANTE: Cuando el usuario diga "véndeme el X a nombre de [persona]" o "el X para [persona]", ' +
+    'SIEMPRE incluye el nombre de la persona en el campo nombre_comprador al llamar actualizarEstadoNumeros. ' +
+    'Si el usuario no menciona un nombre, no incluyas nombre_comprador. ' +
+    'Confirma siempre la acción realizada con un mensaje claro y amigable, incluyendo el nombre del comprador si fue proporcionado.';
 
   // Construir el mensaje actual del usuario
   progress('💬 Procesando mensaje...');

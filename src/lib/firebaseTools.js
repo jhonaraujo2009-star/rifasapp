@@ -52,9 +52,10 @@ export async function verificarDisponibilidad(storeId, numeros) {
  * @param {string} storeId
  * @param {string[]} numeros
  * @param {'vendido'|'disponible'} estado
+ * @param {string|null} [nombreComprador] — nombre del comprador (solo para vendido)
  * @returns {Promise<Object>}
  */
-export async function actualizarEstadoNumeros(storeId, numeros, estado) {
+export async function actualizarEstadoNumeros(storeId, numeros, estado, nombreComprador = null) {
   const batch = writeBatch(db);
   const actualizados = [];
 
@@ -68,13 +69,13 @@ export async function actualizarEstadoNumeros(storeId, numeros, estado) {
 
     const updateData =
       estado === 'disponible'
-        ? { estado: 'disponible', cliente_nombre: null, cliente_id: null, fecha_apartado: null }
-        : { estado: 'vendido', fecha_apartado: new Date() };
+        ? { estado: 'disponible', cliente_nombre: null, cliente_id: null, fecha_apartado: null, fecha_compra: null }
+        : { estado: 'vendido', fecha_apartado: new Date(), cliente_nombre: nombreComprador || null, fecha_compra: new Date() };
 
     batch.update(ref, updateData);
     actualizados.push(padded);
   }
 
   await batch.commit();
-  return { actualizados, nuevoEstado: estado, total: actualizados.length };
+  return { actualizados, nuevoEstado: estado, total: actualizados.length, comprador: nombreComprador || null };
 }

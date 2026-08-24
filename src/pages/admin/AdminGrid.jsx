@@ -54,6 +54,8 @@ export default function AdminGrid() {
   // Rango: seleccionar del X al Y
   const [rangoDesde, setRangoDesde] = useState('');
   const [rangoHasta, setRangoHasta] = useState('');
+  // Nombre del comprador (para marcar como vendido)
+  const [nombreComprador, setNombreComprador] = useState('');
 
   const fetchData = useCallback(async () => {
     if (!currentUser) return;
@@ -145,13 +147,19 @@ export default function AdminGrid() {
           numero: num,
           estado: nuevoEstado,
           ...(nuevoEstado === 'apartado' ? { fecha_apartado: serverTimestamp() } : { fecha_apartado: null }),
-          ...(nuevoEstado !== 'vendido' ? { cliente_nombre: null, cliente_id: null } : {}),
+          ...(nuevoEstado === 'vendido'
+            ? { cliente_nombre: nombreComprador.trim() || null, fecha_compra: serverTimestamp() }
+            : { cliente_nombre: null, fecha_compra: null, cliente_id: null }),
           updatedAt: serverTimestamp(),
         }, { merge: true });
       });
       await batch.commit();
-      toast.success(`✅ ${seleccionados.size} número${seleccionados.size > 1 ? 's' : ''} marcado${seleccionados.size > 1 ? 's' : ''} como "${nuevoEstado}"`);
+      const nombreMsg = nuevoEstado === 'vendido' && nombreComprador.trim()
+        ? ` a nombre de "${nombreComprador.trim()}"`
+        : '';
+      toast.success(`✅ ${seleccionados.size} número${seleccionados.size > 1 ? 's' : ''} marcado${seleccionados.size > 1 ? 's' : ''} como "${nuevoEstado}"${nombreMsg}`);
       setSeleccionados(new Set());
+      setNombreComprador('');
       await fetchData();
     } catch (e) {
       console.error(e);
@@ -292,7 +300,7 @@ export default function AdminGrid() {
                 onClick={() => toggle(n)}
                 onMouseEnter={() => setHovered(n)}
                 onMouseLeave={() => setHovered(null)}
-                title={`#${String(n).padStart(3,'0')} — ${estado}${estadoMap[n]?.cliente_nombre ? ` (${estadoMap[n].cliente_nombre})` : ''}`}
+                title={`#${String(n).padStart(3,'0')} — ${estado}${estadoMap[n]?.cliente_nombre ? ` · ${estadoMap[n].cliente_nombre}` : ''}${estadoMap[n]?.fecha_compra ? ` · ${new Date(estadoMap[n].fecha_compra.seconds ? estadoMap[n].fecha_compra.seconds * 1000 : estadoMap[n].fecha_compra).toLocaleDateString('es-ES')}` : ''}`}
                 style={cellStyle}
               >
                 {isSel && <span style={{ position: 'absolute', top: 2, right: 3, width: 6, height: 6, borderRadius: '50%', background: '#ffd700' }} />}
@@ -329,19 +337,42 @@ export default function AdminGrid() {
               // centrado dentro del espacio disponible a la derecha del sidebar
             }}
           >
-            <div style={{ borderRadius: 20, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(13,11,30,0.97)', backdropFilter: 'blur(20px)', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', boxShadow: '0 8px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)' }}>
+            <div style={{ borderRadius: 20, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(13,11,30,0.97)', backdropFilter: 'blur(20px)', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 12, boxShadow: '0 8px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)' }}>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(124,58,237,0.25)', border: '1px solid rgba(124,58,237,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Zap size={16} color="#a78bfa" />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(124,58,237,0.25)', border: '1px solid rgba(124,58,237,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Zap size={16} color="#a78bfa" />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, color: 'white', fontSize: 14 }}>{seleccionados.size} número{seleccionados.size > 1 ? 's' : ''} seleccionado{seleccionados.size > 1 ? 's' : ''}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>¿Qué estado les aplicas?</div>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ fontWeight: 800, color: 'white', fontSize: 14 }}>{seleccionados.size} número{seleccionados.size > 1 ? 's' : ''} seleccionado{seleccionados.size > 1 ? 's' : ''}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>¿Qué estado les aplicas?</div>
+
+                {/* Campo nombre del comprador */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 200px', minWidth: 180 }}>
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 700, whiteSpace: 'nowrap' }}>👤 Comprador:</span>
+                  <input
+                    type="text"
+                    value={nombreComprador}
+                    onChange={e => setNombreComprador(e.target.value)}
+                    placeholder="Nombre del comprador (opcional)"
+                    style={{
+                      flex: 1, padding: '8px 12px', borderRadius: 9,
+                      border: nombreComprador ? '1px solid rgba(124,58,237,0.5)' : '1px solid rgba(255,255,255,0.12)',
+                      background: nombreComprador ? 'rgba(124,58,237,0.1)' : 'rgba(255,255,255,0.05)',
+                      color: 'white', fontSize: 13, outline: 'none',
+                      fontFamily: 'Inter, sans-serif',
+                      transition: 'all 0.2s',
+                    }}
+                    onFocus={e => { e.target.style.borderColor = '#a78bfa'; }}
+                    onBlur={e => { e.target.style.borderColor = nombreComprador ? 'rgba(124,58,237,0.5)' : 'rgba(255,255,255,0.12)'; }}
+                  />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 {ESTADOS_BTN.map(({ key, label, icon: Icon, color, bg, border }) => (
                   <button key={key}
                     onClick={() => aplicarEstado(key)}
