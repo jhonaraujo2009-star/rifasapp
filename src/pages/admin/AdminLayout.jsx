@@ -12,7 +12,7 @@ import { db } from '../../firebase';
 const NAV_LINKS = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/admin/grilla', icon: Grid3X3, label: 'Inventario' },
-  { to: '/admin/clientes', icon: Users, label: 'Clientes' },
+  { to: '/admin/clientes', icon: Users, label: 'Mis Clientes' },
   { to: '/admin/exportar', icon: Download, label: 'Exportar' },
   { to: '/admin/ajustes', icon: Settings, label: 'Ajustes' },
   { to: '/admin/ticket', icon: Ticket, label: 'Ticket Virtual' },

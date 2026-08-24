@@ -9,7 +9,7 @@
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const MODEL   = 'gemini-flash-lite-latest';
 const BASE    = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}`;
-const TIMEOUT = 15000; // 15 segundos máximo por llamada
+const TIMEOUT = 30000; // 30 segundos máximo por llamada
 
 if (!API_KEY) {
   console.error('⚠️ VITE_GEMINI_API_KEY no definida. Reinicia npm run dev.');
@@ -107,7 +107,7 @@ async function callGemini(contents, systemText) {
     return resp.json();
   } catch (err) {
     if (err.name === 'AbortError') {
-      throw new Error('⏱️ Gemini tardó demasiado en responder (más de 15 segundos). Intenta de nuevo.');
+      throw new Error('⏱️ Gemini tardó demasiado en responder (más de 30 segundos). Intenta de nuevo.');
     }
     throw err;
   } finally {
