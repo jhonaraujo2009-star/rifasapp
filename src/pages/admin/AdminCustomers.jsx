@@ -2,15 +2,17 @@ import { useEffect, useState, useMemo } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../firebase';
-import { Search, Users, Ticket, Calendar, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Users, Ticket, Calendar, X, ChevronDown, ChevronUp, List, Grid3X3 } from 'lucide-react';
 
 export default function AdminCustomers() {
   const { currentUser } = useAuth();
   const [store, setStore] = useState(null);
-  const [tickets, setTickets] = useState([]);
+  const [tickets, setTickets] = useState([]); // tickets vendidos
+  const [allTickets, setAllTickets] = useState([]); // TODOS los tickets
   const [busqueda, setBusqueda] = useState('');
   const [loading, setLoading] = useState(true);
-  const [expandido, setExpandido] = useState(null); // nombre expandido en mobile
+  const [expandido, setExpandido] = useState(null);
+  const [vista, setVista] = useState('clientes'); // 'clientes' | 'tabla'
 
   useEffect(() => {
     const init = async () => {
@@ -22,14 +24,15 @@ export default function AdminCustomers() {
         const storeData = { id: ss.docs[0].id, ...ss.docs[0].data() };
         setStore(storeData);
 
-        // Buscar todos los tickets vendidos de esta tienda
+        // Cargar TODOS los tickets de esta tienda
         const tq = query(
           collection(db, 'tickets'),
-          where('storeId', '==', storeData.id),
-          where('estado', '==', 'vendido')
+          where('storeId', '==', storeData.id)
         );
         const ts = await getDocs(tq);
-        setTickets(ts.docs.map(d => ({ id: d.id, ...d.data() })));
+        const allT = ts.docs.map(d => ({ id: d.id, ...d.data() }));
+        setAllTickets(allT);
+        setTickets(allT.filter(t => t.estado === 'vendido'));
       } catch (e) {
         console.error('Error cargando clientes:', e);
       } finally {
@@ -39,17 +42,45 @@ export default function AdminCustomers() {
     init();
   }, [currentUser]);
 
-  // Agrupar tickets por cliente_nombre
+  // ── Mapa de todos los tickets por número ──
+  const ticketMap = useMemo(() => {
+    const map = {};
+    allTickets.forEach(t => { map[t.numero] = t; });
+    return map;
+  }, [allTickets]);
+
+  // ── Tabla completa: 000-999 ──
+  const tablaCompleta = useMemo(() => {
+    return Array.from({ length: 1000 }, (_, i) => {
+      const num = i;
+      const ticket = ticketMap[num];
+      return {
+        numero: num,
+        estado: ticket?.estado || 'disponible',
+        comprador: ticket?.cliente_nombre || null,
+        fechaCompra: ticket?.fecha_compra || null,
+      };
+    });
+  }, [ticketMap]);
+
+  // ── Filtro tabla completa por búsqueda ──
+  const tablaFiltrada = useMemo(() => {
+    if (!busqueda.trim()) return tablaCompleta;
+    const b = busqueda.toLowerCase().trim();
+    return tablaCompleta.filter(t =>
+      String(t.numero).padStart(3, '0').includes(b) ||
+      String(t.numero).includes(b) ||
+      (t.comprador && t.comprador.toLowerCase().includes(b))
+    );
+  }, [tablaCompleta, busqueda]);
+
+  // ── Agrupar tickets vendidos por cliente ──
   const clientes = useMemo(() => {
     const map = {};
     tickets.forEach(t => {
       const nombre = t.cliente_nombre || 'Sin nombre';
       if (!map[nombre]) {
-        map[nombre] = {
-          nombre,
-          numeros: [],
-          fechas: [],
-        };
+        map[nombre] = { nombre, numeros: [], fechas: [] };
       }
       map[nombre].numeros.push(t.numero);
       if (t.fecha_compra) {
@@ -60,7 +91,6 @@ export default function AdminCustomers() {
       }
     });
 
-    // Convertir a array y ordenar por fecha más reciente
     return Object.values(map)
       .map(c => ({
         ...c,
@@ -77,8 +107,8 @@ export default function AdminCustomers() {
       });
   }, [tickets]);
 
-  // Filtro por búsqueda
-  const filtrados = useMemo(() => {
+  // ── Filtro clientes por búsqueda ──
+  const clientesFiltrados = useMemo(() => {
     if (!busqueda.trim()) return clientes;
     const b = busqueda.toLowerCase().trim();
     return clientes.filter(c =>
@@ -87,7 +117,19 @@ export default function AdminCustomers() {
     );
   }, [clientes, busqueda]);
 
-  const totalNumeros = tickets.length;
+  // ── Stats ──
+  const stats = useMemo(() => ({
+    totalClientes: clientes.length,
+    totalVendidos: tickets.length,
+    totalDisponibles: 1000 - allTickets.filter(t => t.estado === 'vendido' || t.estado === 'apartado').length,
+  }), [clientes, tickets, allTickets]);
+
+  // ── Formato fecha ──
+  const formatFecha = (f) => {
+    if (!f) return '—';
+    const date = f.seconds ? new Date(f.seconds * 1000) : new Date(f);
+    return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 12 }}>
@@ -110,7 +152,7 @@ export default function AdminCustomers() {
         <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.18em', marginBottom: 4 }}>Registro de ventas</div>
         <h1 style={{ fontSize: 24, fontWeight: 900, color: 'white', margin: 0 }}>Mis Clientes</h1>
         <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
-          Clientes con tickets vendidos registrados en la rifa
+          Registro completo de tickets vendidos y clientes
         </p>
       </div>
 
@@ -119,28 +161,67 @@ export default function AdminCustomers() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderRadius: 14, background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.3)' }}>
           <Users size={18} color="#a78bfa" />
           <div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: '#c4b5fd' }}>{clientes.length}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: '#c4b5fd' }}>{stats.totalClientes}</div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Clientes</div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderRadius: 14, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}>
           <Ticket size={18} color="#f87171" />
           <div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: '#fca5a5' }}>{totalNumeros}</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Tickets vendidos</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: '#fca5a5' }}>{stats.totalVendidos}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Vendidos</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderRadius: 14, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)' }}>
+          <Ticket size={18} color="#34d399" />
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: '#6ee7b7' }}>{stats.totalDisponibles}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Disponibles</div>
           </div>
         </div>
       </div>
 
-      {/* ── Buscador ───────────────────────────────── */}
-      <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', padding: '14px 16px' }}>
+      {/* ── Toggle de vista + Buscador ─────────────── */}
+      <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+        {/* Botones de vista */}
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            onClick={() => setVista('clientes')}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+              padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              transition: 'all 0.2s',
+              background: vista === 'clientes' ? 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.2))' : 'rgba(255,255,255,0.04)',
+              border: vista === 'clientes' ? '1px solid rgba(124,58,237,0.5)' : '1px solid rgba(255,255,255,0.1)',
+              color: vista === 'clientes' ? '#c4b5fd' : 'rgba(255,255,255,0.45)',
+            }}
+          >
+            <Users size={14} /> Por Cliente
+          </button>
+          <button
+            onClick={() => setVista('tabla')}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+              padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              transition: 'all 0.2s',
+              background: vista === 'tabla' ? 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.2))' : 'rgba(255,255,255,0.04)',
+              border: vista === 'tabla' ? '1px solid rgba(124,58,237,0.5)' : '1px solid rgba(255,255,255,0.1)',
+              color: vista === 'tabla' ? '#c4b5fd' : 'rgba(255,255,255,0.45)',
+            }}
+          >
+            <List size={14} /> Tabla Completa (000–999)
+          </button>
+        </div>
+
+        {/* Buscador */}
         <div style={{ position: 'relative' }}>
           <Search size={14} color="rgba(255,255,255,0.3)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
           <input
             type="text"
             value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
-            placeholder="Buscar por nombre o número..."
+            placeholder={vista === 'clientes' ? 'Buscar por nombre o número...' : 'Buscar por número o nombre del comprador...'}
             style={{
               width: '100%', boxSizing: 'border-box', paddingLeft: 36, paddingRight: busqueda ? 36 : 14,
               paddingTop: 10, paddingBottom: 10, borderRadius: 10,
@@ -159,113 +240,239 @@ export default function AdminCustomers() {
         </div>
       </div>
 
-      {/* ── Lista de clientes ──────────────────────── */}
-      {filtrados.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '50px 0', color: 'rgba(255,255,255,0.3)' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>
-            {busqueda ? 'No se encontraron clientes con esa búsqueda' : 'Aún no hay tickets vendidos con nombre registrado'}
-          </div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.2)' }}>
-            {!busqueda && 'Vende tickets desde el Inventario o el Agente IA e incluye el nombre del comprador'}
-          </div>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filtrados.map((cliente) => {
-            const isExpanded = expandido === cliente.nombre;
-            const mostrarTodos = isExpanded || cliente.numeros.length <= 8;
+      {/* ══════════════════════════════════════════════
+           VISTA 1: POR CLIENTE (agrupado)
+         ══════════════════════════════════════════════ */}
+      {vista === 'clientes' && (
+        <>
+          {clientesFiltrados.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '50px 0', color: 'rgba(255,255,255,0.3)' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                {busqueda ? 'No se encontraron clientes con esa búsqueda' : 'Aún no hay tickets vendidos con nombre registrado'}
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.2)' }}>
+                {!busqueda && 'Vende tickets desde el Inventario o el Agente IA e incluye el nombre del comprador'}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {clientesFiltrados.map((cliente) => {
+                const isExpanded = expandido === cliente.nombre;
+                const mostrarTodos = isExpanded || cliente.numeros.length <= 8;
 
-            return (
-              <div
-                key={cliente.nombre}
-                style={{
-                  borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)',
-                  background: 'rgba(255,255,255,0.03)', padding: '16px 18px',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(124,58,237,0.3)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
-              >
-                {/* Info del cliente */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{
-                      width: 40, height: 40, borderRadius: 12,
-                      background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.2))',
-                      border: '1px solid rgba(124,58,237,0.3)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: 900, color: '#c4b5fd', fontSize: 16,
-                    }}>
-                      {cliente.nombre.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 800, color: 'white', fontSize: 15 }}>
-                        {cliente.nombre}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          padding: '2px 8px', borderRadius: 6,
-                          background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
-                          fontSize: 11, fontWeight: 700, color: '#fca5a5',
+                return (
+                  <div
+                    key={cliente.nombre}
+                    style={{
+                      borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)',
+                      background: 'rgba(255,255,255,0.03)', padding: '16px 18px',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(124,58,237,0.3)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                  >
+                    {/* Info del cliente */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                          width: 40, height: 40, borderRadius: 12,
+                          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.2))',
+                          border: '1px solid rgba(124,58,237,0.3)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontWeight: 900, color: '#c4b5fd', fontSize: 16,
                         }}>
-                          <Ticket size={10} />
-                          {cliente.numeros.length} número{cliente.numeros.length > 1 ? 's' : ''}
-                        </span>
-                        {cliente.ultimaCompra && (
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 4,
-                            fontSize: 11, color: 'rgba(255,255,255,0.35)',
-                          }}>
-                            <Calendar size={10} />
-                            {cliente.ultimaCompra.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
-                          </span>
-                        )}
+                          {cliente.nombre.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 800, color: 'white', fontSize: 15 }}>
+                            {cliente.nombre}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              padding: '2px 8px', borderRadius: 6,
+                              background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
+                              fontSize: 11, fontWeight: 700, color: '#fca5a5',
+                            }}>
+                              <Ticket size={10} />
+                              {cliente.numeros.length} número{cliente.numeros.length > 1 ? 's' : ''}
+                            </span>
+                            {cliente.ultimaCompra && (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                fontSize: 11, color: 'rgba(255,255,255,0.35)',
+                              }}>
+                                <Calendar size={10} />
+                                {cliente.ultimaCompra.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Números comprados */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {(mostrarTodos ? cliente.numeros : cliente.numeros.slice(0, 8)).map(n => (
+                        <span key={n} style={{
+                          padding: '5px 10px', borderRadius: 8,
+                          background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(79,70,229,0.15))',
+                          border: '1px solid rgba(124,58,237,0.3)',
+                          color: '#c4b5fd', fontSize: 12, fontWeight: 800,
+                          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                          letterSpacing: '1px',
+                        }}>
+                          {String(n).padStart(3, '0')}
+                        </span>
+                      ))}
+                      {cliente.numeros.length > 8 && (
+                        <button
+                          onClick={() => setExpandido(isExpanded ? null : cliente.nombre)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 4,
+                            padding: '5px 10px', borderRadius: 8,
+                            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                            color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700,
+                            cursor: 'pointer', transition: 'all 0.2s',
+                          }}
+                        >
+                          {isExpanded ? <><ChevronUp size={11} /> Menos</> : <><ChevronDown size={11} /> +{cliente.numeros.length - 8} más</>}
+                        </button>
+                      )}
                     </div>
                   </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ══════════════════════════════════════════════
+           VISTA 2: TABLA COMPLETA 000–999
+         ══════════════════════════════════════════════ */}
+      {vista === 'tabla' && (
+        <>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: -10 }}>
+            Mostrando {tablaFiltrada.length} de 1.000 números
+            {busqueda && ` · Filtro: "${busqueda}"`}
+          </div>
+
+          {/* Tabla desktop */}
+          <div style={{
+            borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.02)', overflow: 'hidden',
+          }}>
+            {/* Header de tabla */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '80px 1fr 1fr 120px',
+              padding: '12px 18px', background: 'rgba(124,58,237,0.08)',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)',
+              textTransform: 'uppercase', letterSpacing: '0.1em',
+            }} className="tabla-header">
+              <div>Número</div>
+              <div>Estado</div>
+              <div>Comprador</div>
+              <div>Fecha</div>
+            </div>
+
+            {/* Filas */}
+            <div style={{ maxHeight: 600, overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: 'rgba(124,58,237,0.3) transparent' }}>
+              {tablaFiltrada.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.25)', fontSize: 14 }}>
+                  No se encontraron resultados para "{busqueda}"
                 </div>
+              ) : (
+                tablaFiltrada.map(t => {
+                  const esVendido = t.estado === 'vendido';
+                  const esApartado = t.estado === 'apartado';
 
-                {/* Números comprados */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {(mostrarTodos ? cliente.numeros : cliente.numeros.slice(0, 8)).map(n => (
-                    <span key={n} style={{
-                      padding: '5px 10px', borderRadius: 8,
-                      background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(79,70,229,0.15))',
-                      border: '1px solid rgba(124,58,237,0.3)',
-                      color: '#c4b5fd', fontSize: 12, fontWeight: 800,
-                      fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-                      letterSpacing: '1px',
-                    }}>
-                      {String(n).padStart(3, '0')}
-                    </span>
-                  ))}
-
-                  {/* Botón ver más/menos */}
-                  {cliente.numeros.length > 8 && (
-                    <button
-                      onClick={() => setExpandido(isExpanded ? null : cliente.nombre)}
+                  return (
+                    <div
+                      key={t.numero}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 4,
-                        padding: '5px 10px', borderRadius: 8,
-                        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                        color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700,
-                        cursor: 'pointer', transition: 'all 0.2s',
+                        display: 'grid', gridTemplateColumns: '80px 1fr 1fr 120px',
+                        padding: '10px 18px',
+                        borderBottom: '1px solid rgba(255,255,255,0.04)',
+                        transition: 'background 0.15s',
+                        alignItems: 'center',
                       }}
+                      className="tabla-row"
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                     >
-                      {isExpanded ? (
-                        <><ChevronUp size={11} /> Menos</>
-                      ) : (
-                        <><ChevronDown size={11} /> +{cliente.numeros.length - 8} más</>
-                      )}
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                      {/* Número */}
+                      <div style={{
+                        fontWeight: 900, fontSize: 14, color: 'white',
+                        fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                        letterSpacing: '1.5px',
+                      }}>
+                        {String(t.numero).padStart(3, '0')}
+                      </div>
+
+                      {/* Estado */}
+                      <div>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 5,
+                          padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                          background: esVendido
+                            ? 'rgba(239,68,68,0.12)'
+                            : esApartado
+                              ? 'rgba(34,197,94,0.12)'
+                              : 'rgba(255,255,255,0.06)',
+                          border: `1px solid ${esVendido
+                            ? 'rgba(239,68,68,0.3)'
+                            : esApartado
+                              ? 'rgba(34,197,94,0.3)'
+                              : 'rgba(255,255,255,0.1)'}`,
+                          color: esVendido
+                            ? '#fca5a5'
+                            : esApartado
+                              ? '#86efac'
+                              : 'rgba(255,255,255,0.4)',
+                        }}>
+                          <span style={{
+                            width: 6, height: 6, borderRadius: '50%',
+                            background: esVendido ? '#ef4444' : esApartado ? '#22c55e' : 'rgba(255,255,255,0.2)',
+                          }} />
+                          {t.estado.charAt(0).toUpperCase() + t.estado.slice(1)}
+                        </span>
+                      </div>
+
+                      {/* Comprador */}
+                      <div style={{
+                        fontSize: 13, fontWeight: t.comprador ? 700 : 400,
+                        color: t.comprador ? 'white' : 'rgba(255,255,255,0.15)',
+                      }}>
+                        {t.comprador || '—'}
+                      </div>
+
+                      {/* Fecha */}
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+                        {formatFecha(t.fechaCompra)}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Tabla mobile (cards) */}
+          <style>{`
+            .tabla-header, .tabla-row { display: grid !important; }
+            @media(max-width: 640px) {
+              .tabla-header { display: none !important; }
+              .tabla-row {
+                grid-template-columns: 1fr 1fr !important;
+                gap: 6px !important;
+                padding: 12px 14px !important;
+              }
+            }
+          `}</style>
+        </>
       )}
 
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>

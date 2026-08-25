@@ -6,7 +6,7 @@ import { db } from '../firebase';
 import NumberGrid from '../components/NumberGrid';
 import CountdownTimer from '../components/CountdownTimer';
 import CheckoutModal from '../components/CheckoutModal';
-import { Search, Filter, ShoppingCart, X, Download, Smartphone, Lock, Clock, Tag } from 'lucide-react';
+import { Search, Filter, ShoppingCart, X, Download, Smartphone, Lock, Clock, Tag, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 /* Detecta si es iOS */
@@ -88,6 +88,8 @@ export default function StorePage() {
   const [busqueda, setBusqueda] = useState('');
   const [loadingStore, setLoadingStore] = useState(true);
   const { canInstall, install } = usePWAInstall();
+  const [showTransparencia, setShowTransparencia] = useState(false);
+  const [busquedaTransparencia, setBusquedaTransparencia] = useState('');
 
   // Banner PWA: mostrar si no lo han cerrado antes y no está ya instalada
   const [showPWABanner, setShowPWABanner] = useState(() => {
@@ -297,6 +299,26 @@ export default function StorePage() {
               </button>
             </div>
 
+            {/* Botón Tabla de Compradores */}
+            <div style={{ borderRadius: 16, border: '1px solid #e9ecef', background: '#fff', padding: '16px', marginBottom: 14, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+              <button onClick={() => { setShowTransparencia(true); setBusquedaTransparencia(''); }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  padding: '12px', borderRadius: 10,
+                  border: `1px solid ${color}44`, background: `${color}08`,
+                  color: color, fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = `${color}18`; }}
+                onMouseLeave={e => { e.currentTarget.style.background = `${color}08`; }}
+              >
+                <Users size={15} /> Tabla de Compradores
+              </button>
+              <div style={{ fontSize: 11, color: '#adb5bd', textAlign: 'center', marginTop: 6 }}>
+                Ver todos los números y sus compradores
+              </div>
+            </div>
+
 
           </div>
 
@@ -466,6 +488,193 @@ export default function StorePage() {
           onSuccess={() => { setShowCheckout(false); setSeleccionados([]); }}
         />
       )}
+
+      {/* ── Modal Tabla de Compradores (público) ──── */}
+      <AnimatePresence>
+        {showTransparencia && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 200,
+              background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 16,
+            }}
+            onClick={() => setShowTransparencia(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+              onClick={e => e.stopPropagation()}
+              style={{
+                width: '100%', maxWidth: 700, maxHeight: '85vh',
+                background: '#fff', borderRadius: 20,
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                display: 'flex', flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                padding: '18px 22px', borderBottom: '1px solid #e9ecef',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: `linear-gradient(135deg, ${color}08, ${color}03)`,
+              }}>
+                <div>
+                  <div style={{ fontWeight: 900, color: '#212529', fontSize: 17, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Users size={18} color={color} /> Tabla de Compradores
+                  </div>
+                  <div style={{ fontSize: 12, color: '#868e96', marginTop: 2 }}>
+                    Todos los números de la rifa — Transparencia total 🔍
+                  </div>
+                </div>
+                <button onClick={() => setShowTransparencia(false)}
+                  style={{
+                    width: 34, height: 34, borderRadius: 10,
+                    background: '#f1f3f5', border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                  <X size={16} color="#868e96" />
+                </button>
+              </div>
+
+              {/* Buscador */}
+              <div style={{ padding: '12px 22px', borderBottom: '1px solid #f1f3f5' }}>
+                <div style={{ position: 'relative' }}>
+                  <Search size={14} color="#adb5bd" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                  <input
+                    type="text"
+                    value={busquedaTransparencia}
+                    onChange={e => setBusquedaTransparencia(e.target.value)}
+                    placeholder="Buscar por nombre del comprador o número..."
+                    style={{
+                      width: '100%', boxSizing: 'border-box', paddingLeft: 36,
+                      paddingRight: busquedaTransparencia ? 36 : 14,
+                      paddingTop: 10, paddingBottom: 10, borderRadius: 10,
+                      border: '1px solid #dee2e6', background: '#f8f9fa',
+                      color: '#212529', fontSize: 13, outline: 'none',
+                      fontFamily: 'Inter, sans-serif',
+                    }}
+                    onFocus={e => { e.target.style.borderColor = color; }}
+                    onBlur={e => { e.target.style.borderColor = '#dee2e6'; }}
+                  />
+                  {busquedaTransparencia && (
+                    <button onClick={() => setBusquedaTransparencia('')}
+                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#adb5bd', cursor: 'pointer' }}>
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Tabla de números */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+                {/* Header de tabla */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '70px 1fr 1fr',
+                  padding: '10px 22px',
+                  background: '#f8f9fa', borderBottom: '1px solid #e9ecef',
+                  fontSize: 11, fontWeight: 800, color: '#868e96',
+                  textTransform: 'uppercase', letterSpacing: '0.08em',
+                  position: 'sticky', top: 0, zIndex: 1,
+                }}>
+                  <div>Nº</div>
+                  <div>Estado</div>
+                  <div>Comprador</div>
+                </div>
+
+                {/* Filas */}
+                {(() => {
+                  const ticketMap = {};
+                  tickets.forEach(t => { ticketMap[t.numero] = t; });
+
+                  const b = busquedaTransparencia.toLowerCase().trim();
+                  const filas = Array.from({ length: 1000 }, (_, i) => {
+                    const t = ticketMap[i] || {};
+                    return {
+                      numero: i,
+                      estado: t.estado || 'disponible',
+                      comprador: t.cliente_nombre || null,
+                    };
+                  }).filter(row => {
+                    if (!b) return true;
+                    return (
+                      String(row.numero).padStart(3, '0').includes(b) ||
+                      String(row.numero).includes(b) ||
+                      (row.comprador && row.comprador.toLowerCase().includes(b))
+                    );
+                  });
+
+                  if (filas.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '40px 20px', color: '#adb5bd' }}>
+                        <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
+                        No se encontraron resultados para "{busquedaTransparencia}"
+                      </div>
+                    );
+                  }
+
+                  return filas.map(row => {
+                    const esVendido = row.estado === 'vendido';
+                    const esApartado = row.estado === 'apartado';
+                    return (
+                      <div key={row.numero} style={{
+                        display: 'grid', gridTemplateColumns: '70px 1fr 1fr',
+                        padding: '9px 22px', borderBottom: '1px solid #f1f3f5',
+                        alignItems: 'center', transition: 'background 0.1s',
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#f8f9fa'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <div style={{
+                          fontWeight: 900, fontSize: 13, color: '#212529',
+                          fontFamily: '"JetBrains Mono", monospace', letterSpacing: '1px',
+                        }}>
+                          {String(row.numero).padStart(3, '0')}
+                        </div>
+                        <div>
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                            background: esVendido ? '#fee2e2' : esApartado ? '#dcfce7' : '#f3f4f6',
+                            border: `1px solid ${esVendido ? '#fca5a5' : esApartado ? '#86efac' : '#d1d5db'}`,
+                            color: esVendido ? '#b91c1c' : esApartado ? '#15803d' : '#6b7280',
+                          }}>
+                            <span style={{
+                              width: 5, height: 5, borderRadius: '50%',
+                              background: esVendido ? '#ef4444' : esApartado ? '#22c55e' : '#9ca3af',
+                            }} />
+                            {row.estado.charAt(0).toUpperCase() + row.estado.slice(1)}
+                          </span>
+                        </div>
+                        <div style={{
+                          fontSize: 13, fontWeight: row.comprador ? 700 : 400,
+                          color: row.comprador ? '#212529' : '#d1d5db',
+                        }}>
+                          {row.comprador || '—'}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Footer */}
+              <div style={{
+                padding: '12px 22px', borderTop: '1px solid #e9ecef',
+                background: '#f8f9fa', textAlign: 'center',
+                fontSize: 11, color: '#adb5bd', fontWeight: 600,
+              }}>
+                🎟️ {store.nombre} — Sorteo transparente
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Banner de instalación PWA ─────────────── */}
       <AnimatePresence>
