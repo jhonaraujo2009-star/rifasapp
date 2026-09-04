@@ -9,11 +9,12 @@
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// Modelos en orden de prioridad: el más rápido primero, fallback si hay 503
+// Modelos en orden de prioridad (probados y verificados)
 const MODELS = [
-  'gemini-3.5-flash-lite',   // ⚡ Más rápido y ligero (reemplaza 2.0-flash-lite)
-  'gemini-2.0-flash',        // ⚡ Rápido, buen balance
-  'gemini-1.5-flash',        // ⚡ Backup confiable
+  'gemini-2.5-flash',        // ✅ Verificado funcionando
+  'gemini-3.5-flash',        // ✅ Verificado funcionando
+  'gemini-3.5-flash-lite',   // ⚡ Fallback (a veces 503 por demanda)
+  'gemini-3.6-flash',        // ⚡ Fallback (a veces 503 por demanda)
 ];
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const TIMEOUT  = 30000; // 30 segundos máximo por llamada
