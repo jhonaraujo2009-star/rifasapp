@@ -1,15 +1,22 @@
 // =============================================================
 //  geminiAgent.js — REST API directa (sin SDK)
 //  ✅ Optimizado:
-//    - Modelo: gemini-2.5-flash (más rápido e inteligente)
-//    - Timeout: 15 segundos por llamada (no se queda pegado)
+//    - Fallback automático: gemini-2.0-flash-lite → 2.0-flash → 1.5-flash
+//    - Si un modelo da 503/429, salta al siguiente SIN demora
+//    - Timeout: 30 segundos por modelo
 //    - Callbacks de progreso en tiempo real
 // =============================================================
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const MODEL   = 'gemini-flash-lite-latest';
-const BASE    = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}`;
-const TIMEOUT = 30000; // 30 segundos máximo por llamada
+
+// Modelos en orden de prioridad: el más rápido primero, fallback si hay 503
+const MODELS = [
+  'gemini-2.0-flash-lite',   // ⚡ Más rápido, 30 RPM gratis, 1500 RPD
+  'gemini-2.0-flash',        // ⚡ Rápido, 15 RPM gratis, 1500 RPD
+  'gemini-1.5-flash',        // ⚡ Backup confiable, 15 RPM gratis, 1500 RPD
+];
+const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+const TIMEOUT  = 30000; // 30 segundos máximo por llamada
 
 if (!API_KEY) {
   console.error('⚠️ VITE_GEMINI_API_KEY no definida. Reinicia npm run dev.');
@@ -77,7 +84,7 @@ const FUNCTION_DECLARATIONS = [
   },
 ];
 
-/* ── Llamada a la API REST con timeout ──────────────────────── */
+/* ── Llamada a la API REST con timeout y fallback automático ── */
 async function callGemini(contents, systemText) {
   const body = {
     systemInstruction: {
@@ -88,31 +95,59 @@ async function callGemini(contents, systemText) {
     generationConfig: { temperature: 0.2 },
   };
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT);
+  let lastError = null;
 
-  try {
-    const resp = await fetch(`${BASE}:generateContent?key=${API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
+  for (const model of MODELS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT);
 
-    if (!resp.ok) {
+    try {
+      const url = `${API_BASE}/${model}:generateContent?key=${API_KEY}`;
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (resp.ok) {
+        console.log(`✅ Respuesta exitosa con modelo: ${model}`);
+        return resp.json();
+      }
+
       const err = await resp.json();
-      throw new Error(JSON.stringify(err));
-    }
+      const code = err?.error?.code || resp.status;
 
-    return resp.json();
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error('⏱️ Gemini tardó demasiado en responder (más de 30 segundos). Intenta de nuevo.');
+      // 503 (sobrecarga) o 429 (límite de cuota): intentar siguiente modelo
+      if (code === 503 || code === 429) {
+        console.warn(`⚠️ ${model} no disponible (${code}), intentando siguiente modelo...`);
+        lastError = new Error(`${model}: ${err?.error?.message || `Error ${code}`}`);
+        continue;
+      }
+
+      // Otro error: fallar inmediatamente
+      throw new Error(JSON.stringify(err));
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.warn(`⏱️ ${model} tardó demasiado, intentando siguiente modelo...`);
+        lastError = new Error(`${model}: timeout`);
+        continue;
+      }
+      // Si no es timeout ni 503/429, propagar el error
+      if (!lastError || (!err.message.includes('503') && !err.message.includes('429'))) {
+        throw err;
+      }
+      lastError = err;
+    } finally {
+      clearTimeout(timer);
     }
-    throw err;
-  } finally {
-    clearTimeout(timer);
   }
+
+  // Si todos los modelos fallaron
+  throw new Error(
+    '❌ Todos los modelos están sobrecargados. Intenta de nuevo en unos segundos.\n' +
+    `Último error: ${lastError?.message || 'desconocido'}`
+  );
 }
 
 /**
