@@ -1,7 +1,7 @@
 // =============================================================
 //  geminiAgent.js — REST API directa (sin SDK)
 //  ✅ Optimizado:
-//    - Fallback automático: gemini-2.0-flash-lite → 2.0-flash → 1.5-flash
+//    - Fallback automático: gemini-3.5-flash-lite → 2.0-flash → 1.5-flash
 //    - Si un modelo da 503/429, salta al siguiente SIN demora
 //    - Timeout: 30 segundos por modelo
 //    - Callbacks de progreso en tiempo real
@@ -11,9 +11,9 @@ const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 // Modelos en orden de prioridad: el más rápido primero, fallback si hay 503
 const MODELS = [
-  'gemini-2.0-flash-lite',   // ⚡ Más rápido, 30 RPM gratis, 1500 RPD
-  'gemini-2.0-flash',        // ⚡ Rápido, 15 RPM gratis, 1500 RPD
-  'gemini-1.5-flash',        // ⚡ Backup confiable, 15 RPM gratis, 1500 RPD
+  'gemini-3.5-flash-lite',   // ⚡ Más rápido y ligero (reemplaza 2.0-flash-lite)
+  'gemini-2.0-flash',        // ⚡ Rápido, buen balance
+  'gemini-1.5-flash',        // ⚡ Backup confiable
 ];
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const TIMEOUT  = 30000; // 30 segundos máximo por llamada
